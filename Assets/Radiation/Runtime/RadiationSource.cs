@@ -48,6 +48,37 @@ namespace RadiationSimulation
         [SerializeField, Min(0.0001f)] private float particleRadius = 0.01f;
         public float ParticleRadius => particleRadius;
 
+        public void CopyConfigurationFrom(RadiationSource other)
+        {
+            if (other == null) return;
+            particlePrefab = other.particlePrefab;
+            emissionRate = other.emissionRate;
+            maxParticles = other.maxParticles;
+            particleSpeed = other.particleSpeed;
+            lifetime = other.lifetime;
+            lifetimeVariation = other.lifetimeVariation;
+            initialIntensity = other.initialIntensity;
+            referenceDistance = other.referenceDistance;
+            flowShape = other.flowShape;
+            coneAngle = other.coneAngle;
+            collisionMask = other.collisionMask;
+            minimumIntensity = other.minimumIntensity;
+            collisionSkin = other.collisionSkin;
+            minParticleSize = other.minParticleSize;
+            maxParticleSize = other.maxParticleSize;
+            particleMesh = other.particleMesh;
+            particleMaterial = other.particleMaterial;
+            useGpuInstancing = other.useGpuInstancing;
+            particleRadius = other.particleRadius;
+        }
+
+        public void SetEmission(float rate, float intensity, RadiationFlowShape shape)
+        {
+            emissionRate = Mathf.Max(0f, rate);
+            initialIntensity = Mathf.Max(0f, intensity);
+            flowShape = shape;
+        }
+
         private void Update()
         {
             if (emissionRate <= 0f) return;
