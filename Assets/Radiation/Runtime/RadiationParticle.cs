@@ -47,8 +47,11 @@ namespace RadiationSimulation
             while (remaining > 0.000001f && initialized)
             {
                 if (remainingLifetime <= 0f || Intensity <= source.MinimumIntensity) { Despawn(); break; }
-                float speed = velocity.magnitude; if (speed <= 0.000001f) { Despawn(); break; }
                 float stepTime = Mathf.Min(remaining, remainingLifetime);
+                velocity += RadiationMagnet.EvaluateAcceleration(transform.position, velocity, this) * stepTime;
+                float magnetSpeedLimit = RadiationMagnet.GetMaximumParticleSpeed();
+                if (!float.IsPositiveInfinity(magnetSpeedLimit)) velocity = Vector3.ClampMagnitude(velocity, magnetSpeedLimit);
+                float speed = velocity.magnitude; if (speed <= 0.000001f) { Despawn(); break; }
                 float distance = speed * stepTime;
                 Vector3 direction = velocity / speed; Vector3 origin = transform.position;
                 float radius = source.ParticleRadius;
