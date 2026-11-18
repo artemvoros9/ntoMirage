@@ -31,7 +31,7 @@ namespace RadiationSimulation
             float remain=Time.fixedDeltaTime; Collider ignored=null; int guard=0;
             while(remain>1e-6f&&initialized&&guard++<8)
             {
-                if(remainingLifetime<=0||Intensity<=source.MinimumIntensity){Despawn();break;}
+                if(remainingLifetime<=0){Despawn();break;}
                 float dt=Mathf.Min(remain,remainingLifetime);
                 Vector3 a=RadiationMagnet.EvaluateAcceleration(transform.position,velocity,this);
                 velocity += a * dt;
@@ -42,7 +42,7 @@ namespace RadiationSimulation
                 if(!found){MovePath(distance,dt);remain-=dt;continue;}
                 float move=Mathf.Clamp(near-source.CollisionSkin,0,distance); float used=move/speedNow; MovePath(move,used); if(!initialized)break;
                 var interaction=hit.collider.GetComponent(typeof(IRadiationInteraction)) as IRadiationInteraction ?? hit.collider.GetComponentInParent(typeof(IRadiationInteraction)) as IRadiationInteraction;
-                if(interaction==null){Despawn();break;} var result=interaction.ProcessRadiation(this,hit); transmission*=Mathf.Clamp01(result.IntensityMultiplier); if(result.Reflected) velocity=Vector3.Reflect(velocity,hit.normal); else velocity*=Mathf.Max(0,result.SpeedMultiplier); if(result.DestroyParticle||Intensity<=source.MinimumIntensity){Despawn();break;}
+                if(interaction==null){Despawn();break;} var result=interaction.ProcessRadiation(this,hit); transmission*=Mathf.Clamp01(result.IntensityMultiplier); if(result.Reflected) velocity=Vector3.Reflect(velocity,hit.normal); else velocity*=Mathf.Max(0,result.SpeedMultiplier); if(result.DestroyParticle){Despawn();break;}
                 transform.position += (velocity.sqrMagnitude>1e-8f?velocity.normalized:dir)*source.CollisionSkin; ignored=hit.collider; float consumed=Mathf.Max(used,1e-5f); remain-=consumed;
             }
             if ((++visualTick & 1) == 0) UpdateVisuals();
