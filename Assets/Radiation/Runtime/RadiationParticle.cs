@@ -33,8 +33,8 @@ namespace RadiationSimulation
             {
                 if(remainingLifetime<=0||Intensity<=source.MinimumIntensity){Despawn();break;}
                 float dt=Mathf.Min(remain,remainingLifetime);
-                Vector3 a=RadiationMagnet.EvaluateAcceleration(transform.position,velocity,this); // Boris-like rotation: magnetic acceleration is perpendicular; midpoint rotation preserves speed.
-                if(a.sqrMagnitude>1e-12f&&velocity.sqrMagnitude>1e-12f){float speed=velocity.magnitude; Vector3 axis=Vector3.Cross(velocity,a); if(axis.sqrMagnitude>1e-12f) velocity=Quaternion.AngleAxis(a.magnitude/speed*dt*Mathf.Rad2Deg,axis.normalized)*velocity;}
+                Vector3 a=RadiationMagnet.EvaluateAcceleration(transform.position,velocity,this);
+                velocity += a * dt;
                 float max=RadiationMagnet.GetMaximumParticleSpeed(); if(!float.IsPositiveInfinity(max)) velocity=Vector3.ClampMagnitude(velocity,max);
                 float speedNow=velocity.magnitude; if(speedNow<=1e-6f){Despawn();break;} float distance=speedNow*dt; Vector3 dir=velocity/speedNow;
                 int hitCount=Physics.SphereCastNonAlloc(transform.position,source.ParticleRadius,dir,castBuffer,distance+source.CollisionSkin,source.CollisionMask,QueryTriggerInteraction.Collide); RaycastHit hit=default; bool found=false; float near=float.MaxValue;
