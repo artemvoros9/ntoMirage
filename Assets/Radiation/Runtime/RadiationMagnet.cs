@@ -5,12 +5,10 @@ namespace RadiationSimulation
 {
     public enum RadiationMagnetPolarity { Attract, Repel }
 
-    /// <summary>Magnetic field that bends radiation-particle trajectories without spawning objects.</summary>
+    /// <summary>Uniform-ish magnetic field whose force is the Lorentz q/m(v x B).</summary>
     public sealed class RadiationMagnet : MonoBehaviour
     {
         private static readonly List<RadiationMagnet> ActiveMagnets = new();
-
-        [Header("Field")]
         [SerializeField, Min(0.01f)] private float radius = 3f;
         [SerializeField, Min(0f)] private float strength = 8f;
         [SerializeField] private RadiationMagnetPolarity polarity = RadiationMagnetPolarity.Attract;
@@ -18,16 +16,13 @@ namespace RadiationSimulation
         [SerializeField, Min(0f)] private float maxAcceleration = 100f;
         [SerializeField, Min(0f)] private float maxParticleSpeed = 50f;
         [SerializeField] private bool affectParticlesOutsideRadius;
-
         public float Radius => radius;
         public float Strength => strength;
         public RadiationMagnetPolarity Polarity => polarity;
 
-        private void OnEnable()
-        {
-            if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this);
-        }
-
+        public void Configure(float newRadius, float newStrength, RadiationMagnetPolarity newPolarity)
+        { radius = Mathf.Max(.01f, newRadius); strength = Mathf.Max(0f, newStrength); polarity = newPolarity; }
+        private void OnEnable() { if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this); }
         private void OnDisable() => ActiveMagnets.Remove(this);
 
         public static Vector3 EvaluateAcceleration(Vector3 position, Vector3 velocity, RadiationParticle particle)
@@ -35,45 +30,27 @@ namespace RadiationSimulation
             Vector3 result = Vector3.zero;
             for (int i = ActiveMagnets.Count - 1; i >= 0; i--)
             {
-                var magnet = ActiveMagnets[i];
-                if (magnet == null || !magnet.isActiveAndEnabled) { ActiveMagnets.RemoveAt(i); continue; }
-                Vector3 offset = magnet.transform.position - position;
-                float distance = offset.magnitude;
-                if (!magnet.affectParticlesOutsideRadius && distance > magnet.radius) continue;
-                if (distance <= 0.0001f) continue;
-                float normalizedDistance = Mathf.Clamp01(distance / magnet.radius);
-                float field = magnet.strength * (magnet.affectParticlesOutsideRadius ? 1f : 1f - normalizedDistance);
-                field *= Mathf.Pow(Mathf.Max(0f, 1f - normalizedDistance), magnet.falloff - 1f);
-                Vector3 direction = offset / distance;
-                if (magnet.polarity == RadiationMagnetPolarity.Repel) direction = -direction;
-                result += Vector3.ClampMagnitude(direction * field, magnet.maxAcceleration);
+                var m = ActiveMagnets[i];
+                if (m == null || !m.isActiveAndEnabled) { ActiveMagnets.RemoveAt(i); continue; }
+                Vector3 offset = position - m.transform.position;
+                float d = offset.magnitude;
+                if (!m.affectParticlesOutsideRadius && d > m.radius) continue;
+                float n = Mathf.Clamp01(d / m.radius);
+                float field = m.strength;
+                if (!m.affectParticlesOutsideRadius) field *= Mathf.Pow(Mathf.Max(0f, 1f - n), Mathf.Max(.01f, m.falloff));
+                float sign = m.polarity == RadiationMagnetPolarity.Attract ? 1f : -1f;
+                Vector3 B = m.transform.up * (field * sign);
+                result += Vector3.ClampMagnitude(Vector3.Cross(velocity, B), m.maxAcceleration);
             }
-            return Vector3.ClampMagnitude(result, 1000f);
+            return result;
         }
-
         public static float GetMaximumParticleSpeed()
         {
-            float maximum = float.PositiveInfinity;
-            for (int i = 0; i < ActiveMagnets.Count; i++)
-            {
-                if (ActiveMagnets[i] != null && ActiveMagnets[i].isActiveAndEnabled)
-                    maximum = Mathf.Min(maximum, ActiveMagnets[i].maxParticleSpeed);
-            }
-            return maximum;
+            float max = float.PositiveInfinity;
+            for (int i = 0; i < ActiveMagnets.Count; i++) if (ActiveMagnets[i] != null && ActiveMagnets[i].isActiveAndEnabled) max = Mathf.Min(max, ActiveMagnets[i].maxParticleSpeed);
+            return max;
         }
-
-        private void OnValidate()
-        {
-            radius = Mathf.Max(0.01f, radius);
-            strength = Mathf.Max(0f, strength);
-            maxAcceleration = Mathf.Max(0f, maxAcceleration);
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            Gizmos.color = polarity == RadiationMagnetPolarity.Attract ? new Color(0.1f, 0.4f, 1f, 0.3f) : new Color(1f, 0.15f, 0.1f, 0.3f);
-            Gizmos.DrawWireSphere(transform.position, radius);
-            Gizmos.DrawLine(transform.position, transform.position + transform.up * 0.5f);
-        }
+        private void OnValidate() { radius = Mathf.Max(.01f, radius); strength = Mathf.Max(0f, strength); maxAcceleration = Mathf.Max(0f, maxAcceleration); }
+        private void OnDrawGizmosSelected() { Gizmos.color = polarity == RadiationMagnetPolarity.Attract ? new Color(.1f,.4f,1f,.3f) : new Color(1f,.15f,.1f,.3f); Gizmos.DrawWireSphere(transform.position, radius); Gizmos.DrawLine(transform.position, transform.position + transform.up * .5f); }
     }
 }

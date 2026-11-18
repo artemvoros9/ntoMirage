@@ -165,9 +165,6 @@ MonoBehaviour:
   collisionSkin: 0.002
   minParticleSize: 0.015
   maxParticleSize: 0.06
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  particleMaterial: {fileID: 15303, guid: 0000000000000000f000000000000000, type: 0}
-  useGpuInstancing: 1
   particleRadius: 0.01
 --- !u!4 &43211456
 Transform:
@@ -332,7 +329,7 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 267192114}
   m_Enabled: 1
-  serializedVersion: 12
+  serializedVersion: 13
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.2
@@ -384,7 +381,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShadowRadius: 0
+  m_ShapeRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -979,9 +976,6 @@ MonoBehaviour:
   collisionSkin: 0.002
   minParticleSize: 0.5
   maxParticleSize: 1
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  particleMaterial: {fileID: 1992790094}
-  useGpuInstancing: 1
   particleRadius: 0.01
 --- !u!4 &948212979
 Transform:
@@ -1408,9 +1402,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 1283673957}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 198397028d5478d409e3c20b94168b9b, type: 3}
+  m_Script: {fileID: 11500000, guid: 84b81543bd9e5a644acb98bf5ad8fe86, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.OpaqueRadiationBarrier
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.AttenuatingRadiationBarrier
+  opaque: 1
+  density: 1
+  attenuationCoefficient: 1
+  normalThickness: 0
 --- !u!23 &1283673959
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1634,13 +1632,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1421451312}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.15371142, y: 0.7953451, z: -0.5534854, w: 0.19352752}
-  m_LocalPosition: {x: -1, y: 12.45, z: -0.06}
+  m_LocalRotation: {x: 0.32521155, y: -0, z: -0, w: 0.94564134}
+  m_LocalPosition: {x: 0.26, y: 9.49, z: -8.58}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 70.038, y: 156.215, z: 5.088}
+  m_LocalEulerAnglesHint: {x: 37.957, y: 0, z: 0}
 --- !u!21 &1774414243
 Material:
   serializedVersion: 8

@@ -165,9 +165,6 @@ MonoBehaviour:
   collisionSkin: 0.002
   minParticleSize: 0.015
   maxParticleSize: 0.06
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  particleMaterial: {fileID: 15303, guid: 0000000000000000f000000000000000, type: 0}
-  useGpuInstancing: 1
   particleRadius: 0.01
 --- !u!4 &43211456
 Transform:
@@ -979,9 +976,6 @@ MonoBehaviour:
   collisionSkin: 0.002
   minParticleSize: 0.5
   maxParticleSize: 1
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  particleMaterial: {fileID: 1992790094}
-  useGpuInstancing: 1
   particleRadius: 0.01
 --- !u!4 &948212979
 Transform:
@@ -1408,9 +1402,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 1283673957}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 198397028d5478d409e3c20b94168b9b, type: 3}
+  m_Script: {fileID: 11500000, guid: 84b81543bd9e5a644acb98bf5ad8fe86, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.OpaqueRadiationBarrier
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.AttenuatingRadiationBarrier
+  opaque: 1
+  density: 1
+  attenuationCoefficient: 1
+  normalThickness: 0
 --- !u!23 &1283673959
 MeshRenderer:
   m_ObjectHideFlags: 0

@@ -8,6 +8,17 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/RadiationDemo.unity
+    guid: 981154c477234e648a92f7ad19105fb5
+  - enabled: 1
+    path: Assets/Scenes/Scenario_ConcreteAttenuation.unity
+    guid: 00a9d6e862a344f1a8c6186d119a2ec9
+  - enabled: 1
+    path: Assets/Scenes/Scenario_MirrorMagnet.unity
+    guid: 6603276269de4315933a20fc67f4f851
+  - enabled: 1
+    path: Assets/Scenes/Scenario_SecondaryEmission.unity
+    guid: 0c5de05f09be4ffc89d5996374532672
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  m_UseUCBPForAssetBundles: 0

@@ -23,14 +23,7 @@ namespace RadiationSimulation
         [SerializeField, Min(0.0001f)] private float collisionSkin = 0.002f;
         [SerializeField, Min(0.001f)] private float minParticleSize = 0.015f;
         [SerializeField, Min(0.001f)] private float maxParticleSize = 0.06f;
-        [Header("GPU Instanced Visualization")]
-        [SerializeField] private Mesh particleMesh;
-        [SerializeField] private Material particleMaterial;
-        [SerializeField] private bool useGpuInstancing = true;
-
         private readonly Queue<RadiationParticle> pool = new();
-        private readonly List<Matrix4x4> instanceMatrices = new(1023);
-        private readonly List<Vector4> instanceColors = new(1023);
         private readonly HashSet<RadiationParticle> activeParticles = new();
         private float emissionAccumulator;
         private bool warnedMissingPrefab;
@@ -42,9 +35,19 @@ namespace RadiationSimulation
         public float MinParticleSize => minParticleSize;
         public float MaxParticleSize => maxParticleSize;
         public LayerMask CollisionMask => collisionMask;
-        public bool UseGpuInstancing => useGpuInstancing;
-        public Mesh ParticleMesh => particleMesh;
-        public Material ParticleMaterial => particleMaterial;
+        public float EmissionRate => emissionRate;
+        public int MaxParticles => maxParticles;
+        public float ParticleSpeed => particleSpeed;
+        public float Lifetime => lifetime;
+        public float LifetimeVariation => lifetimeVariation;
+        public float ConeAngle => coneAngle;
+        public RadiationFlowShape FlowShape => flowShape;
+        public int ActiveParticleCount => activeParticles.Count;
+        public void ConfigureRuntime(float rate, float speed, float life, float variation, float intensity, float cone, RadiationFlowShape shape)
+        {
+            emissionRate = Mathf.Max(0f, rate); particleSpeed = Mathf.Max(0.01f, speed); lifetime = Mathf.Max(0.01f, life);
+            lifetimeVariation = Mathf.Clamp01(variation); initialIntensity = Mathf.Max(0f, intensity); coneAngle = Mathf.Clamp(cone, 0f, 180f); flowShape = shape;
+        }
         [SerializeField, Min(0.0001f)] private float particleRadius = 0.01f;
         public float ParticleRadius => particleRadius;
 
@@ -66,9 +69,6 @@ namespace RadiationSimulation
             collisionSkin = other.collisionSkin;
             minParticleSize = other.minParticleSize;
             maxParticleSize = other.maxParticleSize;
-            particleMesh = other.particleMesh;
-            particleMaterial = other.particleMaterial;
-            useGpuInstancing = other.useGpuInstancing;
             particleRadius = other.particleRadius;
         }
 
@@ -96,36 +96,6 @@ namespace RadiationSimulation
             int count = Mathf.Min(Mathf.FloorToInt(emissionAccumulator), available);
             emissionAccumulator -= count;
             for (int i = 0; i < count; i++) Emit();
-        }
-
-        private void LateUpdate()
-        {
-            if (!useGpuInstancing || particleMesh == null || particleMaterial == null || activeParticles.Count == 0) return;
-            if (!particleMaterial.enableInstancing) particleMaterial.enableInstancing = true;
-            instanceMatrices.Clear();
-            instanceColors.Clear();
-            foreach (var particle in activeParticles)
-            {
-                if (particle == null || !particle.gameObject.activeSelf) continue;
-                float alpha = Mathf.Clamp01(particle.Intensity / Mathf.Max(0.0001f, initialIntensity));
-                instanceMatrices.Add(Matrix4x4.TRS(particle.transform.position, particle.transform.rotation, particle.transform.lossyScale));
-                instanceColors.Add(new Vector4(1f, 0.18f, 0.02f, alpha));
-                if (instanceMatrices.Count == 1023)
-                {
-                    DrawInstances(0, 1023);
-                    instanceMatrices.Clear(); instanceColors.Clear();
-                }
-            }
-            if (instanceMatrices.Count > 0) DrawInstances(0, instanceMatrices.Count);
-        }
-
-        private void DrawInstances(int offset, int count)
-        {
-            var props = new MaterialPropertyBlock();
-            props.SetVectorArray("_Color", instanceColors.GetRange(offset, count).ToArray());
-            var batch = instanceMatrices.GetRange(offset, count).ToArray();
-            Graphics.DrawMeshInstanced(particleMesh, 0, particleMaterial, batch, count, props,
-                UnityEngine.Rendering.ShadowCastingMode.Off, false, gameObject.layer);
         }
 
         private void Emit()
@@ -171,13 +141,19 @@ namespace RadiationSimulation
         {
             if (particle == null) return;
             activeParticles.Remove(particle);
-            if (!pool.Contains(particle)) pool.Enqueue(particle);
+            pool.Enqueue(particle);
         }
 
         private void OnDisable()
         {
             foreach (var particle in activeParticles)
-                if (particle != null) particle.gameObject.SetActive(false);
+            {
+                if (particle != null)
+                {
+                    particle.gameObject.SetActive(false);
+                    pool.Enqueue(particle);
+                }
+            }
             activeParticles.Clear();
         }
 
