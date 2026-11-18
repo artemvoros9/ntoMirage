@@ -17,13 +17,18 @@ namespace RadiationSimulation
     public sealed class RadiationSandboxController : MonoBehaviour
     {
         private static readonly Color SelectionColor = new Color(0.15f, 0.9f, 1f, 0.95f);
+        private static RadiationSandboxController instance;
         private Component selectedObject;
         private GameObject selectionMarker;
         private bool dragging, paused, showPanel = true;
         private bool interactionCollidersReady;
         private float simulationSpeed = 1f, dragDepth, height;
         private Vector3 dragOffset;
-        private GUIStyle panelStyle, titleStyle, labelStyle, buttonStyle;
+        private Vector2 scrollPos;
+        private GUIStyle panelStyle, cardStyle, titleStyle, sectionStyle, labelStyle, mutedStyle;
+        private GUIStyle buttonStyle, activeButtonStyle, sliderStyle, sliderThumbStyle, scrollbarStyle, scrollbarThumbStyle;
+        private Texture2D panelBackgroundTex;
+        private readonly List<Texture2D> guiTextures = new();
         private float fps, fpsTimer, frameMs = float.NaN, gpuMs = float.NaN;
         private int frames;
         private double lastCpuSeconds;
@@ -38,14 +43,31 @@ namespace RadiationSimulation
 
         private void Awake()
         {
+            if (instance != null && instance != this) { Destroy(gameObject); return; }
+            instance = this;
             DontDestroyOnLoad(gameObject);
             SceneManager.sceneLoaded += OnSceneLoaded;
             lastCpuTicks = Process.GetCurrentProcess().TotalProcessorTime.Ticks;
             lastCpuSeconds = Time.realtimeSinceStartupAsDouble;
         }
 
-        private void OnDestroy() { SceneManager.sceneLoaded -= OnSceneLoaded; ClearMarker(); }
-        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) { selectedObject = null; ClearMarker(); dragging = false; }
+        private void OnDestroy()
+        {
+            if (instance == this) instance = null;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            ClearMarker();
+            ClearGuiTextures();
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            selectedObject = null;
+            ClearMarker();
+            dragging = false;
+            paused = false;
+            interactionCollidersReady = false;
+            Time.timeScale = simulationSpeed;
+        }
 
         private void Update()
         {
@@ -154,11 +176,10 @@ namespace RadiationSimulation
 
         private bool PointerOverPanel()
         {
-            if (!showPanel) return false;
             Vector2 p = PointerPosition();
-            // Screen coordinates have their origin at bottom-left; GUI areas use top-left.
-            float panelHeight = Mathf.Max(30f, Screen.height - 24f);
-            return p.x >= 12f && p.x <= 352f && p.y >= 24f && p.y <= Screen.height - 12f;
+            if (!showPanel)
+                return p.x >= 12f && p.x <= 132f && p.y >= Screen.height - 40f && p.y <= Screen.height - 12f;
+            return p.x >= 12f && p.x <= 352f && p.y >= 12f && p.y <= Screen.height - 12f;
         }
 
         private static Camera GetActiveCamera()
@@ -224,26 +245,64 @@ namespace RadiationSimulation
             if (selectedObject == component) return;
             selectedObject = component; height = component.transform.position.y;
             ClearMarker();
-            // Object selection remains functional without a visual outline.
+            if (selectedObject != null) selectionMarker = SelectionHighlight.Create(selectedObject.gameObject, SelectionColor);
         }
         private void ClearMarker() { if (selectionMarker != null) Destroy(selectionMarker); selectionMarker = null; }
 
         private void OnGUI()
         {
-            if (panelStyle == null) BuildStyles();
-            if (!showPanel) { if (GUI.Button(new Rect(12, 12, 120, 28), "Показать UI", buttonStyle)) showPanel = true; return; }
-            GUILayout.BeginArea(new Rect(12, 12, 340, Screen.height - 24), panelStyle);
+            EnsureStyles();
+            GUI.color = Color.white;
+            GUI.backgroundColor = Color.white;
+            GUI.contentColor = Color.white;
+
+            if (!showPanel)
+            {
+                if (GUI.Button(new Rect(12, 12, 120, 28), "Показать UI", buttonStyle)) showPanel = true;
+                return;
+            }
+
+            GUILayout.BeginArea(new Rect(12, 12, 340, Mathf.Max(120f, Screen.height - 24f)), panelStyle);
+            GUILayout.BeginHorizontal();
             GUILayout.Label("RADIATION SANDBOX", titleStyle);
-            GUILayout.Label($"FPS {fps:0} | Frame {FormatMs(frameMs)} | GPU {FormatMs(gpuMs)}\nCPU {FormatPercent(cpuPercent)} | Частицы {sceneParticleCount} | Коллайдеры {sceneColliderCount}", labelStyle);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Скрыть", buttonStyle, GUILayout.Width(72f))) showPanel = false;
+            GUILayout.EndHorizontal();
+            GUILayout.Label("Сцена: " + SceneManager.GetActiveScene().name, mutedStyle);
+            GUILayout.Space(4);
+
+            GUIStyle prevThumb = GUI.skin.verticalScrollbarThumb;
+            GUI.skin.verticalScrollbarThumb = scrollbarThumbStyle;
+            scrollPos = GUILayout.BeginScrollView(scrollPos, false, false, GUIStyle.none, scrollbarStyle);
+
+            GUILayout.BeginVertical(cardStyle);
+            GUILayout.Label($"FPS {fps:0}  |  Frame {FormatMs(frameMs)}  |  GPU {FormatMs(gpuMs)}", labelStyle);
+            GUILayout.Label($"CPU {FormatPercent(cpuPercent)}  |  Частицы {sceneParticleCount}  |  Коллайдеры {sceneColliderCount}", mutedStyle);
+            GUILayout.EndVertical();
+
+            GUILayout.BeginVertical(cardStyle);
+            GUILayout.Label("СИМУЛЯЦИЯ", sectionStyle);
             bool newPaused = GUILayout.Toggle(paused, paused ? "▶  Продолжить" : "Ⅱ  Пауза", buttonStyle);
             if (newPaused != paused) { paused = newPaused; Time.timeScale = paused ? 0f : simulationSpeed; }
+            GUILayout.Space(4);
             GUILayout.Label($"Скорость: {simulationSpeed:0.00}x", labelStyle);
-            float speed = GUILayout.HorizontalSlider(simulationSpeed, 0.1f, 3f);
+            float speed = GUILayout.HorizontalSlider(simulationSpeed, 0.1f, 3f, sliderStyle, sliderThumbStyle);
             if (!Mathf.Approximately(speed, simulationSpeed)) { simulationSpeed = speed; if (!paused) Time.timeScale = simulationSpeed; }
-            if (GUILayout.Button("Original — перезагрузить сцену", buttonStyle)) { Time.timeScale = 1f; SceneManager.LoadScene(SceneManager.GetActiveScene().name); }
+            GUILayout.Space(4);
+            if (GUILayout.Button("Перезагрузить сцену", buttonStyle))
+            {
+                simulationSpeed = 1f;
+                paused = false;
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            }
+            GUILayout.EndVertical();
+
             DrawScenarioButtons();
-            if (GUILayout.Button("Скрыть панель", buttonStyle)) showPanel = false;
-            GUILayout.Space(8); DrawSelectedInspector();
+            DrawSelectedInspector();
+
+            GUILayout.EndScrollView();
+            GUI.skin.verticalScrollbarThumb = prevThumb;
             GUILayout.EndArea();
         }
 
@@ -252,9 +311,31 @@ namespace RadiationSimulation
 
         private void DrawScenarioButtons()
         {
-            GUILayout.Label("СЦЕНАРИИ", titleStyle);
-            for (int i = 0; i < 4; i++) if (GUILayout.Button(i == 0 ? "Сценарий 0" : "Сценарий " + i, buttonStyle)) InvokeFactoryLoad(i);
+            string activeScene = SceneManager.GetActiveScene().name;
+            GUILayout.BeginVertical(cardStyle);
+            GUILayout.Label("СЦЕНАРИИ", sectionStyle);
+            for (int row = 0; row < 2; row++)
+            {
+                GUILayout.BeginHorizontal();
+                for (int col = 0; col < 2; col++)
+                {
+                    int i = row * 2 + col;
+                    GUIStyle style = IsScenarioScene(activeScene, i) ? activeButtonStyle : buttonStyle;
+                    if (GUILayout.Button("Сценарий " + i, style)) InvokeFactoryLoad(i);
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndVertical();
         }
+
+        private static bool IsScenarioScene(string sceneName, int index) => index switch
+        {
+            0 => sceneName == "RadiationDemo",
+            1 => sceneName == "Scenario_ConcreteAttenuation",
+            2 => sceneName == "Scenario_MirrorMagnet",
+            3 => sceneName == "Scenario_SecondaryEmission",
+            _ => false
+        };
 
         private static void InvokeFactoryLoad(int index)
         {
@@ -266,11 +347,25 @@ namespace RadiationSimulation
 
         private void DrawSelectedInspector()
         {
-            if (selectedObject == null) { GUILayout.Label("Кликните по объекту для выбора и перетаскивания.", labelStyle); return; }
-            GUILayout.Label("ВЫБРАНО: " + selectedObject.name, titleStyle);
-            height = GUILayout.HorizontalSlider(height, -10f, 10f); selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, height, selectedObject.transform.position.z);
-            GUILayout.Label($"Высота: {height:0.00} | Поворот Y: {selectedObject.transform.eulerAngles.y:0}°", labelStyle);
-            float rot = GUILayout.HorizontalSlider(selectedObject.transform.eulerAngles.y, 0f, 360f); selectedObject.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+            GUILayout.BeginVertical(cardStyle);
+            if (selectedObject == null)
+            {
+                GUILayout.Label("ИНСПЕКТОР", sectionStyle);
+                GUILayout.Label("Кликните по объекту для выбора и перетаскивания.", mutedStyle);
+                GUILayout.EndVertical();
+                return;
+            }
+
+            GUILayout.Label("ВЫБРАНО: " + selectedObject.name, sectionStyle);
+            GUILayout.Label($"Высота: {height:0.00}", labelStyle);
+            height = GUILayout.HorizontalSlider(height, -10f, 10f, sliderStyle, sliderThumbStyle);
+            selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, height, selectedObject.transform.position.z);
+
+            GUILayout.Label($"Поворот Y: {selectedObject.transform.eulerAngles.y:0}°", labelStyle);
+            float rot = GUILayout.HorizontalSlider(selectedObject.transform.eulerAngles.y, 0f, 360f, sliderStyle, sliderThumbStyle);
+            selectedObject.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+
+            GUILayout.Space(4);
             if (selectedObject is RadiationDosimeter dosimeter)
             {
                 GUILayout.Label($"Дозиметр | доза {dosimeter.Dose:0.00} / {dosimeter.DoseToRed:0.00}", labelStyle);
@@ -278,46 +373,360 @@ namespace RadiationSimulation
             }
             else if (selectedObject is RadiationSource source) DrawSource(source);
             else if (selectedObject is RadiationMagnet magnet) DrawMagnet(magnet);
-            else if (selectedObject is AttenuatingRadiationBarrier barrier) { GUILayout.Label("Плотность", labelStyle); barrier.density = GUILayout.HorizontalSlider(barrier.density, 0f, 10f); }
-            else if (selectedObject is RadiationMirror mirror) mirror.reflectivity = GUILayout.HorizontalSlider(mirror.reflectivity, 0f, 1f);
-            else if (selectedObject is RadiationSpeedReducer reducer) reducer.speedMultiplier = GUILayout.HorizontalSlider(reducer.speedMultiplier, 0f, 1f);
+            else if (selectedObject is AttenuatingRadiationBarrier barrier)
+            {
+                GUILayout.Label($"Плотность: {barrier.density:0.00}", labelStyle);
+                barrier.density = GUILayout.HorizontalSlider(barrier.density, 0f, 10f, sliderStyle, sliderThumbStyle);
+            }
+            else if (selectedObject is RadiationMirror mirror)
+            {
+                GUILayout.Label($"Отражение: {mirror.reflectivity:0.00}", labelStyle);
+                mirror.reflectivity = GUILayout.HorizontalSlider(mirror.reflectivity, 0f, 1f, sliderStyle, sliderThumbStyle);
+            }
+            else if (selectedObject is RadiationSpeedReducer reducer)
+            {
+                GUILayout.Label($"Замедление: {reducer.speedMultiplier:0.00}", labelStyle);
+                reducer.speedMultiplier = GUILayout.HorizontalSlider(reducer.speedMultiplier, 0f, 1f, sliderStyle, sliderThumbStyle);
+            }
+            GUILayout.EndVertical();
         }
 
         private void DrawSource(RadiationSource s)
         {
             GUILayout.Label($"Источник | active {s.ActiveParticleCount} / {s.MaxParticles}", labelStyle);
             float rate = GetFloat(s, "EmissionRate", 40f), speed = GetFloat(s, "ParticleSpeed", 8f), life = GetFloat(s, "Lifetime", 6f), variation = GetFloat(s, "LifetimeVariation", .25f), cone = GetFloat(s, "ConeAngle", 30f);
-            GUILayout.Label($"Rate {rate:0.0}  Speed {speed:0.0}  Life {life:0.0}", labelStyle);
-            if (GUILayout.Button("Конус", buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Cone);
-            if (GUILayout.Button("Луч", buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Ray);
-            if (GUILayout.Button("Сфера", buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Omnidirectional);
-            GUILayout.Label($"Variation {variation:0.00}  Cone {cone:0}°", labelStyle);
+            GUILayout.Label($"Rate {rate:0.0}  |  Speed {speed:0.0}  |  Life {life:0.0}", mutedStyle);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Конус", s.FlowShape == RadiationFlowShape.Cone ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Cone);
+            if (GUILayout.Button("Луч", s.FlowShape == RadiationFlowShape.Ray ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Ray);
+            if (GUILayout.Button("Сфера", s.FlowShape == RadiationFlowShape.Omnidirectional ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Omnidirectional);
+            GUILayout.EndHorizontal();
+            GUILayout.Label($"Variation {variation:0.00}  |  Cone {cone:0}°", mutedStyle);
         }
+
         private void DrawMagnet(RadiationMagnet m) { GUILayout.Label($"Магнит | radius {m.Radius:0.0} | strength {m.Strength:0.0} | {m.Polarity}", labelStyle); }
 
         private static float GetFloat(object o, string name, float fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(float) ? (float)p.GetValue(o) : fallback; }
         private static int GetInt(object o, string name, int fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(int) ? (int)p.GetValue(o) : fallback; }
 
-        private void BuildStyles()
+        private void EnsureStyles()
         {
-            panelStyle = new GUIStyle(GUI.skin.box) { normal = { background = MakeTexture(new Color(.025f, .05f, .08f, .94f)) }, padding = new RectOffset(14, 14, 12, 12) };
-            titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, normal = { textColor = SelectionColor } };
-            labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, normal = { textColor = Color.white } };
-            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 12, margin = new RectOffset(0, 0, 2, 2) };
+            // не сносится при смене сцены
+            if (panelStyle != null && panelBackgroundTex != null) return;
+            ClearGuiTextures();
+
+            panelBackgroundTex = MakeBorderedTexture(new Color(0.055f, 0.082f, 0.125f, 0.94f), new Color(0.15f, 0.90f, 1f, 0.35f));
+            panelStyle = new GUIStyle(GUI.skin.box)
+            {
+                normal = { background = panelBackgroundTex },
+                border = new RectOffset(1, 1, 1, 1),
+                padding = new RectOffset(12, 12, 12, 12)
+            };
+
+            cardStyle = new GUIStyle(GUI.skin.box)
+            {
+                normal = { background = MakeBorderedTexture(new Color(0.085f, 0.125f, 0.185f, 0.92f), new Color(0.70f, 0.88f, 1f, 0.12f)) },
+                border = new RectOffset(1, 1, 1, 1),
+                padding = new RectOffset(10, 10, 8, 8),
+                margin = new RectOffset(0, 0, 3, 3)
+            };
+
+            titleStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 15,
+                fontStyle = FontStyle.Bold,
+                normal = { textColor = SelectionColor },
+                margin = new RectOffset(0, 0, 2, 0)
+            };
+
+            sectionStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Bold,
+                normal = { textColor = new Color(0.55f, 0.86f, 0.96f, 1f) },
+                margin = new RectOffset(0, 0, 0, 4)
+            };
+
+            labelStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 12,
+                wordWrap = true,
+                normal = { textColor = new Color(0.92f, 0.95f, 0.98f, 1f) },
+                margin = new RectOffset(0, 0, 1, 1)
+            };
+
+            mutedStyle = new GUIStyle(labelStyle)
+            {
+                fontSize = 11,
+                normal = { textColor = new Color(0.65f, 0.74f, 0.84f, 1f) }
+            };
+
+            Texture2D btnNormal = MakeBorderedTexture(new Color(0.11f, 0.165f, 0.245f, 1f), new Color(0.45f, 0.72f, 0.95f, 0.28f));
+            Texture2D btnHover = MakeBorderedTexture(new Color(0.15f, 0.23f, 0.34f, 1f), new Color(0.15f, 0.90f, 1f, 0.65f));
+            Texture2D btnActive = MakeBorderedTexture(new Color(0.18f, 0.30f, 0.44f, 1f), SelectionColor);
+            Texture2D btnOn = MakeBorderedTexture(new Color(0.09f, 0.30f, 0.40f, 1f), SelectionColor);
+
+            buttonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 12,
+                alignment = TextAnchor.MiddleCenter,
+                border = new RectOffset(1, 1, 1, 1),
+                padding = new RectOffset(10, 10, 6, 6),
+                margin = new RectOffset(2, 2, 2, 2),
+                normal = { background = btnNormal, textColor = new Color(0.92f, 0.96f, 1f, 1f) },
+                hover = { background = btnHover, textColor = Color.white },
+                active = { background = btnActive, textColor = Color.white },
+                focused = { background = btnNormal, textColor = Color.white },
+                onNormal = { background = btnOn, textColor = Color.white },
+                onHover = { background = btnHover, textColor = Color.white },
+                onActive = { background = btnActive, textColor = Color.white },
+                onFocused = { background = btnOn, textColor = Color.white }
+            };
+
+            activeButtonStyle = new GUIStyle(buttonStyle)
+            {
+                fontStyle = FontStyle.Bold,
+                normal = { background = btnOn, textColor = Color.white },
+                hover = { background = btnHover, textColor = Color.white }
+            };
+
+            sliderStyle = new GUIStyle(GUI.skin.horizontalSlider)
+            {
+                fixedHeight = 14f,
+                border = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(0, 0, 0, 0),
+                margin = new RectOffset(0, 0, 2, 4),
+                normal = { background = MakeSliderTrackTexture(new Color(0.045f, 0.07f, 0.11f, 1f), new Color(0.30f, 0.60f, 0.80f, 0.45f)) }
+            };
+
+            Texture2D thumbNormal = MakeBorderedTexture(SelectionColor, new Color(0.85f, 0.98f, 1f, 0.9f));
+            Texture2D thumbHover = MakeBorderedTexture(new Color(0.50f, 0.95f, 1f, 1f), Color.white);
+            sliderThumbStyle = new GUIStyle(GUI.skin.horizontalSliderThumb)
+            {
+                fixedWidth = 12f,
+                fixedHeight = 14f,
+                border = new RectOffset(1, 1, 1, 1),
+                normal = { background = thumbNormal },
+                hover = { background = thumbHover },
+                active = { background = thumbHover },
+                focused = { background = thumbNormal }
+            };
+
+            scrollbarStyle = new GUIStyle(GUI.skin.verticalScrollbar)
+            {
+                fixedWidth = 8f,
+                border = new RectOffset(0, 0, 0, 0),
+                normal = { background = MakeSolidTexture(new Color(0.04f, 0.06f, 0.09f, 0.55f)) }
+            };
+
+            scrollbarThumbStyle = new GUIStyle(GUI.skin.verticalScrollbarThumb)
+            {
+                fixedWidth = 8f,
+                border = new RectOffset(0, 0, 0, 0),
+                normal = { background = MakeSolidTexture(new Color(0.22f, 0.52f, 0.68f, 0.75f)) },
+                hover = { background = MakeSolidTexture(SelectionColor) },
+                active = { background = MakeSolidTexture(SelectionColor) }
+            };
         }
-        private static Texture2D MakeTexture(Color color) { Texture2D t = new Texture2D(1, 1); t.SetPixel(0, 0, color); t.Apply(); return t; }
+
+        private Texture2D MakeSolidTexture(Color color)
+        {
+            var t = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Point
+            };
+            t.SetPixel(0, 0, color);
+            t.Apply();
+            guiTextures.Add(t);
+            return t;
+        }
+
+        private Texture2D MakeBorderedTexture(Color fill, Color border)
+        {
+            var t = new Texture2D(3, 3, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Point
+            };
+            for (int y = 0; y < 3; y++)
+                for (int x = 0; x < 3; x++)
+                    t.SetPixel(x, y, x == 1 && y == 1 ? fill : border);
+            t.Apply();
+            guiTextures.Add(t);
+            return t;
+        }
+
+        private Texture2D MakeSliderTrackTexture(Color fill, Color border)
+        {
+            var t = new Texture2D(1, 14, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Point
+            };
+            for (int y = 0; y < 14; y++)
+            {
+                Color c = Color.clear;
+                if (y == 5 || y == 8) c = border;
+                else if (y == 6 || y == 7) c = fill;
+                t.SetPixel(0, y, c);
+            }
+            t.Apply();
+            guiTextures.Add(t);
+            return t;
+        }
+
+        private void ClearGuiTextures()
+        {
+            for (int i = 0; i < guiTextures.Count; i++)
+                if (guiTextures[i] != null) Destroy(guiTextures[i]);
+            guiTextures.Clear();
+            panelBackgroundTex = null;
+            panelStyle = null;
+        }
     }
 
     internal static class SelectionHighlight
     {
+        private const float LineWidth = 0.025f;
+        private const float Padding = 0.03f;
+
         public static GameObject Create(GameObject target, Color color)
         {
-            GameObject marker = new GameObject("Selection Highlight"); marker.hideFlags = HideFlags.DontSave; marker.transform.SetParent(target.transform, false); LineRenderer line = marker.AddComponent<LineRenderer>();
-            line.useWorldSpace = false; line.loop = true; line.widthMultiplier = .025f; line.material = new Material(Shader.Find("Sprites/Default")); line.startColor = color; line.endColor = color;
-            Renderer[] rs = target.GetComponentsInChildren<Renderer>(); Bounds b = new Bounds(target.transform.position, Vector3.one * .1f); bool found = false;
-            foreach (Renderer r in rs) { if (!found) { b = r.bounds; found = true; } else b.Encapsulate(r.bounds); }
-            Vector3 min = target.transform.InverseTransformPoint(b.min), max = target.transform.InverseTransformPoint(b.max); line.positionCount = 8; line.SetPositions(new[] { new Vector3(min.x,min.y,min.z), new Vector3(max.x,min.y,min.z), new Vector3(max.x,min.y,max.z), new Vector3(min.x,min.y,max.z), new Vector3(min.x,max.y,min.z), new Vector3(max.x,max.y,min.z), new Vector3(max.x,max.y,max.z), new Vector3(min.x,max.y,max.z) });
+            GameObject marker = new GameObject("Selection Highlight") { hideFlags = HideFlags.DontSave };
+            Transform t = target.transform;
+            marker.transform.SetPositionAndRotation(t.position, t.rotation);
+
+            Bounds bounds = ComputeLocalBounds(target);
+            bounds.Expand(Padding * 2f);
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+
+            Shader shader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
+            Material mat = shader != null ? new Material(shader) { hideFlags = HideFlags.DontSave } : null;
+
+            // обводка
+            var lines = new List<LineRenderer>(6);
+            lines.Add(CreateEdge(marker.transform, "Bottom", mat, color, true,
+                new Vector3(min.x, min.y, min.z), new Vector3(max.x, min.y, min.z),
+                new Vector3(max.x, min.y, max.z), new Vector3(min.x, min.y, max.z)));
+            lines.Add(CreateEdge(marker.transform, "Top", mat, color, true,
+                new Vector3(min.x, max.y, min.z), new Vector3(max.x, max.y, min.z),
+                new Vector3(max.x, max.y, max.z), new Vector3(min.x, max.y, max.z)));
+            lines.Add(CreateEdge(marker.transform, "Edge_0", mat, color, false, new Vector3(min.x, min.y, min.z), new Vector3(min.x, max.y, min.z)));
+            lines.Add(CreateEdge(marker.transform, "Edge_1", mat, color, false, new Vector3(max.x, min.y, min.z), new Vector3(max.x, max.y, min.z)));
+            lines.Add(CreateEdge(marker.transform, "Edge_2", mat, color, false, new Vector3(max.x, min.y, max.z), new Vector3(max.x, max.y, max.z)));
+            lines.Add(CreateEdge(marker.transform, "Edge_3", mat, color, false, new Vector3(min.x, min.y, max.z), new Vector3(min.x, max.y, max.z)));
+
+            var follower = marker.AddComponent<SelectionHighlightFollower>();
+            follower.Init(t, mat, lines.ToArray());
             return marker;
+        }
+
+        private static LineRenderer CreateEdge(Transform parent, string name, Material mat, Color color, bool loop, params Vector3[] points)
+        {
+            var go = new GameObject(name) { hideFlags = HideFlags.DontSave };
+            go.transform.SetParent(parent, false);
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace = false;
+            lr.loop = loop;
+            lr.widthMultiplier = LineWidth;
+            lr.numCornerVertices = 2;
+            lr.numCapVertices = 2;
+            lr.shadowCastingMode = ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            if (mat != null) lr.sharedMaterial = mat;
+            lr.startColor = color;
+            lr.endColor = color;
+            lr.positionCount = points.Length;
+            lr.SetPositions(points);
+            return lr;
+        }
+
+        private static Bounds ComputeLocalBounds(GameObject target)
+        {
+            Transform root = target.transform;
+            Quaternion invRot = Quaternion.Inverse(root.rotation);
+            Vector3 origin = root.position;
+            Bounds result = default;
+            bool found = false;
+
+            foreach (Renderer r in target.GetComponentsInChildren<Renderer>(false))
+            {
+                if (!r.enabled || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+                if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null)
+                    EncapsulateBox(r.transform.localToWorldMatrix, mf.sharedMesh.bounds, origin, invRot, ref result, ref found);
+                else if (r is SkinnedMeshRenderer smr)
+                    EncapsulateBox(r.transform.localToWorldMatrix, smr.localBounds, origin, invRot, ref result, ref found);
+            }
+
+            if (!found)
+            {
+                foreach (Collider c in target.GetComponentsInChildren<Collider>(false))
+                {
+                    if (!c.enabled) continue;
+                    if (c is BoxCollider box)
+                        EncapsulateBox(c.transform.localToWorldMatrix, new Bounds(box.center, box.size), origin, invRot, ref result, ref found);
+                    else if (c is SphereCollider sphere)
+                        EncapsulateBox(c.transform.localToWorldMatrix, new Bounds(sphere.center, Vector3.one * (sphere.radius * 2f)), origin, invRot, ref result, ref found);
+                    else if (c is CapsuleCollider cap)
+                    {
+                        Vector3 size = Vector3.one * (cap.radius * 2f);
+                        size[cap.direction] = Mathf.Max(cap.height, cap.radius * 2f);
+                        EncapsulateBox(c.transform.localToWorldMatrix, new Bounds(cap.center, size), origin, invRot, ref result, ref found);
+                    }
+                    else
+                        EncapsulateBox(Matrix4x4.identity, c.bounds, origin, invRot, ref result, ref found);
+                }
+            }
+
+            return found ? result : new Bounds(Vector3.zero, Vector3.one * 0.4f);
+        }
+
+        private static void EncapsulateBox(Matrix4x4 localToWorld, Bounds b, Vector3 origin, Quaternion invRot, ref Bounds result, ref bool found)
+        {
+            Vector3 min = b.min, max = b.max;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 local = new Vector3((i & 1) == 0 ? min.x : max.x, (i & 2) == 0 ? min.y : max.y, (i & 4) == 0 ? min.z : max.z);
+                Vector3 pt = invRot * (localToWorld.MultiplyPoint3x4(local) - origin);
+                if (!found) { result = new Bounds(pt, Vector3.zero); found = true; }
+                else result.Encapsulate(pt);
+            }
+        }
+    }
+
+    internal sealed class SelectionHighlightFollower : MonoBehaviour
+    {
+        private Transform target;
+        private Material material;
+        private LineRenderer[] lines;
+
+        public void Init(Transform targetTransform, Material mat, LineRenderer[] lineRenderers)
+        {
+            target = targetTransform;
+            material = mat;
+            lines = lineRenderers;
+        }
+
+        private void LateUpdate()
+        {
+            if (target == null) { Destroy(gameObject); return; }
+            bool active = target.gameObject.activeInHierarchy;
+            if (lines != null)
+            {
+                for (int i = 0; i < lines.Length; i++)
+                    if (lines[i] != null && lines[i].enabled != active) lines[i].enabled = active;
+            }
+            if (active) transform.SetPositionAndRotation(target.position, target.rotation);
+        }
+
+        private void OnDestroy()
+        {
+            if (material != null) Destroy(material);
         }
     }
 
