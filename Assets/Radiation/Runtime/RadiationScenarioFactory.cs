@@ -101,7 +101,7 @@ namespace RadiationSimulation
         private static GameObject CreatePrimitive(string name, PrimitiveType type, Vector3 position, Vector3 scale)
         { var go = GameObject.CreatePrimitive(type); go.name = name; go.transform.position = position; go.transform.localScale = scale; return go; }
         private static GameObject CreateBoxPart(GameObject root, string name, Vector3 position, Vector3 scale)
-        { var go = CreatePrimitive(name, PrimitiveType.Cube, position, scale); go.transform.SetParent(root.transform, true); return go; }
+        { var go = CreatePrimitive(name, PrimitiveType.Cube, position, scale); go.transform.SetParent(root.transform, true); var barrier = go.AddComponent<AttenuatingRadiationBarrier>(); barrier.density = 1f; barrier.attenuationCoefficient = 1f; barrier.normalThickness = Mathf.Max(.05f, scale.z); return go; }
         private static AttenuatingRadiationBarrier CreateBarrier(string name, Vector3 position, Vector3 scale, float density)
         { var go = CreatePrimitive(name, PrimitiveType.Cube, position, scale); var b = go.AddComponent<AttenuatingRadiationBarrier>(); b.density = density; return b; }
         private static void SetPrivate<T>(object target, string name, T value)
