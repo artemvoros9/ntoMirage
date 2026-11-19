@@ -79,6 +79,15 @@ namespace RadiationSimulation
             flowShape = shape;
         }
 
+        public void ConfigureEmissionProperties(float rate, float speed, float life, float variation, float intensity)
+        {
+            emissionRate = Mathf.Max(0f, rate);
+            particleSpeed = Mathf.Max(.01f, speed);
+            lifetime = Mathf.Max(.01f, life);
+            lifetimeVariation = Mathf.Clamp01(variation);
+            initialIntensity = Mathf.Max(0f, intensity);
+        }
+
         private void Update()
         {
             if (emissionRate <= 0f) return;
@@ -109,7 +118,10 @@ namespace RadiationSimulation
                 }
                 return;
             }
-            RadiationParticle particle = pool.Count > 0 ? pool.Dequeue() : Instantiate(particlePrefab, transform);
+            RadiationParticle particle = pool.Count > 0 ? pool.Dequeue() : Instantiate(particlePrefab);
+            // Частица должна двигаться в мировом пространстве и не наследовать движение
+            // источника (особенно важно для активированного критического объекта).
+            particle.transform.SetParent(null, true);
             particle.transform.SetPositionAndRotation(transform.position, transform.rotation);
             activeParticles.Add(particle);
             particle.Initialize(this, SampleDirection(), particleSpeed, SampleLifetime(), initialIntensity);

@@ -377,6 +377,9 @@ namespace RadiationSimulation
             {
                 GUILayout.Label($"Плотность: {barrier.density:0.00}", labelStyle);
                 barrier.density = GUILayout.HorizontalSlider(barrier.density, 0f, 10f, sliderStyle, sliderThumbStyle);
+                GUILayout.Label($"Коэффициент ослабления: {barrier.attenuationCoefficient:0.00}", mutedStyle);
+                barrier.attenuationCoefficient = GUILayout.HorizontalSlider(barrier.attenuationCoefficient, 0f, 10f, sliderStyle, sliderThumbStyle);
+                barrier.opaque = GUILayout.Toggle(barrier.opaque, "Непрозрачная стена", buttonStyle);
             }
             else if (selectedObject is RadiationMirror mirror)
             {
@@ -387,6 +390,17 @@ namespace RadiationSimulation
             {
                 GUILayout.Label($"Замедление: {reducer.speedMultiplier:0.00}", labelStyle);
                 reducer.speedMultiplier = GUILayout.HorizontalSlider(reducer.speedMultiplier, 0f, 1f, sliderStyle, sliderThumbStyle);
+                GUILayout.Label($"Потери интенсивности: {reducer.intensityLossPerUnit:0.00}", mutedStyle);
+                reducer.intensityLossPerUnit = GUILayout.HorizontalSlider(reducer.intensityLossPerUnit, 0f, 2f, sliderStyle, sliderThumbStyle);
+            }
+            else if (selectedObject is CriticalRadiationObject critical)
+            {
+                GUILayout.Label($"Критический объект | доза {critical.AccumulatedDose:0.00} / {critical.CriticalDose:0.00}", labelStyle);
+                critical.DestroyIncomingParticles = GUILayout.Toggle(critical.DestroyIncomingParticles, "Уничтожать входящие частицы", buttonStyle);
+                RadiationSource[] emitters = FindObjectsOfType<RadiationSource>();
+                RadiationSource emitter = emitters.Length > 0 ? emitters[0] : null;
+                if (critical.ActivatedSource != null && emitter != null && emitter != critical.ActivatedSource && GUILayout.Button("Синхронизировать частицы с эмиттером", buttonStyle))
+                    critical.SyncActivatedSourceFrom(emitter);
             }
             GUILayout.EndVertical();
         }
@@ -396,15 +410,32 @@ namespace RadiationSimulation
             GUILayout.Label($"Источник | active {s.ActiveParticleCount} / {s.MaxParticles}", labelStyle);
             float rate = GetFloat(s, "EmissionRate", 40f), speed = GetFloat(s, "ParticleSpeed", 8f), life = GetFloat(s, "Lifetime", 6f), variation = GetFloat(s, "LifetimeVariation", .25f), cone = GetFloat(s, "ConeAngle", 30f);
             GUILayout.Label($"Rate {rate:0.0}  |  Speed {speed:0.0}  |  Life {life:0.0}", mutedStyle);
+            float newRate = GUILayout.HorizontalSlider(rate, 0f, 200f, sliderStyle, sliderThumbStyle);
+            float newSpeed = GUILayout.HorizontalSlider(speed, .1f, 50f, sliderStyle, sliderThumbStyle);
+            float newLife = GUILayout.HorizontalSlider(life, .1f, 30f, sliderStyle, sliderThumbStyle);
+            if (!Mathf.Approximately(newRate, rate) || !Mathf.Approximately(newSpeed, speed) || !Mathf.Approximately(newLife, life))
+                s.ConfigureEmissionProperties(newRate, newSpeed, newLife, variation, s.InitialIntensity);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Конус", s.FlowShape == RadiationFlowShape.Cone ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Cone);
-            if (GUILayout.Button("Луч", s.FlowShape == RadiationFlowShape.Ray ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Ray);
-            if (GUILayout.Button("Сфера", s.FlowShape == RadiationFlowShape.Omnidirectional ? activeButtonStyle : buttonStyle)) s.SetEmission(rate, s.InitialIntensity, RadiationFlowShape.Omnidirectional);
+            if (GUILayout.Button("Конус", s.FlowShape == RadiationFlowShape.Cone ? activeButtonStyle : buttonStyle)) s.SetEmission(newRate, s.InitialIntensity, RadiationFlowShape.Cone);
+            if (GUILayout.Button("Луч", s.FlowShape == RadiationFlowShape.Ray ? activeButtonStyle : buttonStyle)) s.SetEmission(newRate, s.InitialIntensity, RadiationFlowShape.Ray);
+            if (GUILayout.Button("Сфера", s.FlowShape == RadiationFlowShape.Omnidirectional ? activeButtonStyle : buttonStyle)) s.SetEmission(newRate, s.InitialIntensity, RadiationFlowShape.Omnidirectional);
             GUILayout.EndHorizontal();
             GUILayout.Label($"Variation {variation:0.00}  |  Cone {cone:0}°", mutedStyle);
         }
 
-        private void DrawMagnet(RadiationMagnet m) { GUILayout.Label($"Магнит | radius {m.Radius:0.0} | strength {m.Strength:0.0} | {m.Polarity}", labelStyle); }
+        private void DrawMagnet(RadiationMagnet m)
+        {
+            GUILayout.Label($"Магнит | radius {m.Radius:0.0} | strength {m.Strength:0.0} | {m.Polarity}", labelStyle);
+            float radius = GUILayout.HorizontalSlider(m.Radius, .1f, 20f, sliderStyle, sliderThumbStyle);
+            float strength = GUILayout.HorizontalSlider(m.Strength, 0f, 100f, sliderStyle, sliderThumbStyle);
+            float falloff = GUILayout.HorizontalSlider(m.Falloff, .1f, 4f, sliderStyle, sliderThumbStyle);
+            RadiationMagnetPolarity polarity = m.Polarity;
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Притяжение", polarity == RadiationMagnetPolarity.Attract ? activeButtonStyle : buttonStyle)) polarity = RadiationMagnetPolarity.Attract;
+            if (GUILayout.Button("Отталкивание", polarity == RadiationMagnetPolarity.Repel ? activeButtonStyle : buttonStyle)) polarity = RadiationMagnetPolarity.Repel;
+            GUILayout.EndHorizontal();
+            m.ConfigureProperties(radius, strength, falloff, polarity, m.AffectParticlesOutsideRadius);
+        }
 
         private static float GetFloat(object o, string name, float fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(float) ? (float)p.GetValue(o) : fallback; }
         private static int GetInt(object o, string name, int fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(int) ? (int)p.GetValue(o) : fallback; }

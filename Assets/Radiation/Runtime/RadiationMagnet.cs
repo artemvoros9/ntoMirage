@@ -19,9 +19,20 @@ namespace RadiationSimulation
         public float Radius => radius;
         public float Strength => strength;
         public RadiationMagnetPolarity Polarity => polarity;
+        public float Falloff => falloff;
+        public bool AffectParticlesOutsideRadius => affectParticlesOutsideRadius;
 
         public void Configure(float newRadius, float newStrength, RadiationMagnetPolarity newPolarity)
         { radius = Mathf.Max(.01f, newRadius); strength = Mathf.Max(0f, newStrength); polarity = newPolarity; }
+
+        public void ConfigureProperties(float newRadius, float newStrength, float newFalloff, RadiationMagnetPolarity newPolarity, bool outsideRadius)
+        {
+            radius = Mathf.Max(.01f, newRadius);
+            strength = Mathf.Max(0f, newStrength);
+            falloff = Mathf.Clamp(newFalloff, .1f, 4f);
+            polarity = newPolarity;
+            affectParticlesOutsideRadius = outsideRadius;
+        }
         private void OnEnable() { if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this); }
         private void OnDisable() => ActiveMagnets.Remove(this);
 
