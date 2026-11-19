@@ -19,9 +19,20 @@ namespace RadiationSimulation
         public float Radius => radius;
         public float Strength => strength;
         public RadiationMagnetPolarity Polarity => polarity;
+        public float Falloff => falloff;
+        public bool AffectParticlesOutsideRadius => affectParticlesOutsideRadius;
 
         public void Configure(float newRadius, float newStrength, RadiationMagnetPolarity newPolarity)
         { radius = Mathf.Max(.01f, newRadius); strength = Mathf.Max(0f, newStrength); polarity = newPolarity; }
+
+        public void ConfigureProperties(float newRadius, float newStrength, float newFalloff, RadiationMagnetPolarity newPolarity, bool outsideRadius)
+        {
+            radius = Mathf.Max(.01f, newRadius);
+            strength = Mathf.Max(0f, newStrength);
+            falloff = Mathf.Clamp(newFalloff, .1f, 4f);
+            polarity = newPolarity;
+            affectParticlesOutsideRadius = outsideRadius;
+        }
         private void OnEnable() { if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this); }
         private void OnDisable() => ActiveMagnets.Remove(this);
 
@@ -39,8 +50,9 @@ namespace RadiationSimulation
                 float field = m.strength;
                 if (!m.affectParticlesOutsideRadius) field *= Mathf.Pow(Mathf.Max(0f, 1f - n), Mathf.Max(.01f, m.falloff));
                 if (d <= 0.0001f) continue;
-                // Radial attraction/repulsion: unlike velocity x B, this points
-                // toward or away from the magnet in every direction.
+                // This component is configured as an attractor/repulsor, so use a
+                // radial force. A velocity x B force bends particles to one side
+                // and cannot attract them toward the magnet center.
                 Vector3 radialDirection = offset / d;
                 float sign = m.polarity == RadiationMagnetPolarity.Attract ? -1f : 1f;
                 result += radialDirection * (field * sign);
