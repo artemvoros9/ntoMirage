@@ -132,8 +132,6 @@ namespace RadiationSimulation
                 return;
             }
             RadiationParticle particle = pool.Count > 0 ? pool.Dequeue() : Instantiate(particlePrefab);
-            // Частица должна двигаться в мировом пространстве и не наследовать движение
-            // источника (особенно важно для активированного критического объекта).
             particle.transform.SetParent(null, true);
             particle.transform.SetPositionAndRotation(transform.position, transform.rotation);
             activeParticles.Add(particle);
@@ -146,9 +144,6 @@ namespace RadiationSimulation
             if (flowShape == RadiationFlowShape.Cone)
             {
                 float cos = Mathf.Cos(coneAngle * Mathf.Deg2Rad);
-                // Uniformly sample the spherical cap. The radial component must be
-                // bounded by the sampled z; using an unconstrained disk would leak
-                // directions outside the configured cone.
                 float z = Mathf.Lerp(cos, 1f, Random.value);
                 float radial = Mathf.Sqrt(Mathf.Max(0f, 1f - z * z));
                 Vector2 disk = Random.insideUnitCircle;

@@ -60,8 +60,6 @@ namespace RadiationSimulation
                 var volume = collider.GetComponent(typeof(IRadiationVolume)) as IRadiationVolume;
                 if (volume == null) continue;
 
-                // Cast from outside both ends: Unity rays starting inside a collider
-                // do not report its exit surface. Clip the interval to this movement.
                 float padding = collider.bounds.size.magnitude + distance + 1f;
                 float castLength = 2f * padding + distance;
                 if (!collider.Raycast(new Ray(start - direction * padding, direction), out var entryHit, castLength)
@@ -72,9 +70,6 @@ namespace RadiationSimulation
                 if (path <= 1e-6f) continue;
 
                 volume.ProcessVolume(this, path);
-                // Keep a stable reduced speed while inside the volume. Do not multiply
-                // the already-reduced velocity every physics step, or the particle
-                // asymptotically stops at the volume boundary.
                 float multiplier = Mathf.Max(0f, volume.GetSpeedMultiplier(this));
                 float targetSpeed = source.ParticleSpeed * multiplier;
                 velocity = velocity.sqrMagnitude > 1e-8f
@@ -88,7 +83,6 @@ namespace RadiationSimulation
         private void Despawn(){initialized=false;if(particleCollider!=null)particleCollider.enabled=false;if(source!=null)source.Release(this);gameObject.SetActive(false);}
     }
 
-    /// <summary>Pure mathematical kernel. No scene objects, rendering, physics queries or frame callbacks.</summary>
     public static class RadiationMath
     {
         public static float InverseSquare(float intensity, float distance, float referenceDistance)
@@ -138,7 +132,6 @@ namespace RadiationSimulation
         RadiationInteractionResult ProcessRadiation(RadiationParticle particle, RaycastHit hit);
     }
 
-    /// <summary>Volume effects are evaluated against actual path length, not frame time.</summary>
     public interface IRadiationVolume
     {
         void ProcessVolume(RadiationParticle particle, float pathLength);

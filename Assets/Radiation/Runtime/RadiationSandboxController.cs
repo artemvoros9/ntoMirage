@@ -13,7 +13,6 @@ using UnityEngine.InputSystem;
 
 namespace RadiationSimulation
 {
-    /// <summary>Runtime sandbox UI, selection and XZ dragging. Deliberately self-contained.</summary>
     public sealed class RadiationSandboxController : MonoBehaviour
     {
         private static readonly Color SelectionColor = new Color(0.15f, 0.9f, 1f, 0.95f);
@@ -190,8 +189,6 @@ namespace RadiationSimulation
         {
 #if ENABLE_INPUT_SYSTEM
             if (Mouse.current == null) return 0f;
-            // Input System versions/devices may report either wheel ticks (1) or
-            // legacy-style units (120). Normalize both to a single tick value.
             float value = Mouse.current.scroll.ReadValue().y;
             return Mathf.Abs(value) > 10f ? value / 120f : value;
 #else
@@ -201,8 +198,6 @@ namespace RadiationSimulation
 
         private void HandleSelectionAndDragging()
         {
-            // IMGUI does not create an EventSystem pointer event. Use the actual panel rectangle,
-            // otherwise a click on the panel can steal the drag state or block world selection.
             if (PointerOverPanel()) return;
             bool down = PointerDown();
             bool held = PointerHeld();
@@ -568,7 +563,6 @@ namespace RadiationSimulation
 
         private void EnsureStyles()
         {
-            // не сносится при смене сцены
             if (panelStyle != null && panelBackgroundTex != null) return;
             ClearGuiTextures();
 
@@ -765,7 +759,6 @@ namespace RadiationSimulation
             Shader shader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
             Material mat = shader != null ? new Material(shader) { hideFlags = HideFlags.DontSave } : null;
 
-            // обводка
             var lines = new List<LineRenderer>(6);
             lines.Add(CreateEdge(marker.transform, "Bottom", mat, color, true,
                 new Vector3(min.x, min.y, min.z), new Vector3(max.x, min.y, min.z),
@@ -887,7 +880,6 @@ namespace RadiationSimulation
         }
     }
 
-    /// <summary>Creates a useful default showcase when a scene has radiation sources but no configured field.</summary>
     public static class RadiationFeatureBootstrap
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -903,7 +895,6 @@ namespace RadiationSimulation
             var fieldObject = new GameObject("Radiation Dosimeter Field");
             fieldObject.AddComponent<RadiationDosimeterField>();
 
-            // Critical objects and their inactive local sources are authored directly in scenes/prefabs.
         }
     }
 }
