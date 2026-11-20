@@ -22,7 +22,13 @@ namespace RadiationSimulation
         public int Count => count;
         public float SphereSize => sphereSize;
         public float Spacing => spacing;
+        public Vector3 GridCenter => gridCenter;
+        public bool UseGrid => useGrid;
+        public float DoseToRed => doseToRed;
+        public float ColorSmoothTime => colorSmoothTime;
         public void Configure(int newCount, float newSize, float newSpacing) { count = Mathf.Max(1,newCount); sphereSize = Mathf.Max(.01f,newSize); spacing = Mathf.Max(.01f,newSpacing); Rebuild(); }
+        public void ConfigureAdvanced(Vector3 center, bool grid, float newDoseToRed, float smoothTime)
+        { gridCenter=center; useGrid=grid; doseToRed=Mathf.Max(.0001f,newDoseToRed); colorSmoothTime=Mathf.Max(.01f,smoothTime); Rebuild(); }
         private void Reset()
         {
             var g = new Gradient(); g.SetKeys(new[] { new GradientColorKey(new Color(.05f,.25f,1f),0f), new GradientColorKey(Color.cyan,.3f), new GradientColorKey(Color.yellow,.65f), new GradientColorKey(Color.red,1f) }, new[] { new GradientAlphaKey(1f,0f), new GradientAlphaKey(1f,1f) }); doseGradient = g;

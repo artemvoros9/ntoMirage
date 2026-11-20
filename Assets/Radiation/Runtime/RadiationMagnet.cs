@@ -20,6 +20,8 @@ namespace RadiationSimulation
         public float Strength => strength;
         public RadiationMagnetPolarity Polarity => polarity;
         public float Falloff => falloff;
+        public float MaxAcceleration => maxAcceleration;
+        public float MaxParticleSpeed => maxParticleSpeed;
         public bool AffectParticlesOutsideRadius => affectParticlesOutsideRadius;
 
         public void Configure(float newRadius, float newStrength, RadiationMagnetPolarity newPolarity)
@@ -33,6 +35,8 @@ namespace RadiationSimulation
             polarity = newPolarity;
             affectParticlesOutsideRadius = outsideRadius;
         }
+        public void ConfigureLimits(float acceleration, float particleSpeed)
+        { maxAcceleration = Mathf.Max(0f, acceleration); maxParticleSpeed = Mathf.Max(0f, particleSpeed); }
         private void OnEnable() { if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this); }
         private void OnDisable() => ActiveMagnets.Remove(this);
 

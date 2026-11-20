@@ -16,6 +16,7 @@ namespace RadiationSimulation
         public RadiationSource ActivatedSource => activatedSource;
         public float ActivatedEmissionRate => activatedEmissionRate;
         public float ActivatedIntensity => activatedIntensity;
+        public float DosePerIntensitySecond => dosePerIntensitySecond;
         public bool DestroyIncomingParticles { get => destroyIncomingParticles; set => destroyIncomingParticles = value; }
 
         public void SyncActivatedSourceFrom(RadiationSource emitter)
@@ -27,6 +28,9 @@ namespace RadiationSimulation
         }
         public void Configure(RadiationSource source,float threshold,float rate,float intensity)
         { activatedSource=source; criticalDose=Mathf.Max(.0001f,threshold); activatedEmissionRate=Mathf.Max(0,rate); activatedIntensity=Mathf.Max(0,intensity); if(activatedSource!=null)activatedSource.gameObject.SetActive(false); }
+        public void ConfigureAdvanced(float threshold, float doseRate, float emissionRate, float intensity, bool destroyParticles)
+        { criticalDose=Mathf.Max(.0001f, threshold); dosePerIntensitySecond=Mathf.Max(0f, doseRate); activatedEmissionRate=Mathf.Max(0f, emissionRate); activatedIntensity=Mathf.Max(0f, intensity); destroyIncomingParticles=destroyParticles; }
+        public void ResetAccumulatedDose() => accumulatedDose = 0f;
         private void Awake(){ownCollider=GetComponent<Collider>();if(ownCollider!=null)ownCollider.enabled=true;if(activatedSource!=null)activatedSource.gameObject.SetActive(false);}
         public RadiationInteractionResult ProcessRadiation(RadiationParticle particle,RaycastHit hit){if(!IsActivated){accumulatedDose+=particle!=null?particle.Intensity*dosePerIntensitySecond*Mathf.Max(0,Time.fixedDeltaTime):0;if(accumulatedDose>=criticalDose)Activate();}return new RadiationInteractionResult(1,1,false,destroyIncomingParticles);}
         private void Activate(){if(activatedSource==null)return;var emitter=FindObjectsOfType<RadiationSource>();for(int i=0;i<emitter.Length;i++){if(emitter[i]!=activatedSource){activatedSource.CopyConfigurationFrom(emitter[i]);break;}}activatedSource.transform.SetParent(transform,false);activatedSource.transform.localPosition=Vector3.zero;activatedSource.SetEmission(activatedEmissionRate,activatedIntensity,activatedSource.FlowShape);activatedSource.gameObject.SetActive(true);accumulatedDose=criticalDose;if(ownCollider!=null)ownCollider.enabled=true;}

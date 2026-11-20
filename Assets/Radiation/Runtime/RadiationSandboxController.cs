@@ -22,6 +22,10 @@ namespace RadiationSimulation
         private GameObject selectionMarker;
         private bool dragging, paused, showPanel = true;
         private bool interactionCollidersReady;
+        private bool cameraInitialized;
+        private Vector3 cameraPivot;
+        private float cameraDistance, cameraYaw, cameraPitch;
+        private Vector2 previousPointer;
         private float simulationSpeed = 1f, dragDepth, height;
         private Vector3 dragOffset;
         private Vector2 scrollPos;
@@ -66,6 +70,7 @@ namespace RadiationSimulation
             dragging = false;
             paused = false;
             interactionCollidersReady = false;
+            cameraInitialized = false;
             Time.timeScale = simulationSpeed;
         }
 
@@ -85,6 +90,7 @@ namespace RadiationSimulation
             }
             if (KeyTogglePanel()) showPanel = !showPanel;
             EnsureInteractionColliders();
+            HandleCameraNavigation();
             HandleSelectionAndDragging();
         }
 
@@ -94,7 +100,7 @@ namespace RadiationSimulation
             var selectable = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
             foreach (var component in selectable)
             {
-                if (!(component is RadiationDosimeter) && !(component is RadiationSource) && !(component is RadiationMagnet) && !(component is AttenuatingRadiationBarrier) && !(component is RadiationMirror) && !(component is RadiationSpeedReducer) && !(component is CriticalRadiationObject)) continue;
+                if (!(component is RadiationDosimeter) && !(component is RadiationDosimeterField) && !(component is RadiationSource) && !(component is RadiationMagnet) && !(component is AttenuatingRadiationBarrier) && !(component is RadiationMirror) && !(component is RadiationSpeedReducer) && !(component is CriticalRadiationObject)) continue;
                 if (component.GetComponentInChildren<Collider>(true) == null)
                 {
                     var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -128,6 +134,71 @@ namespace RadiationSimulation
             catch { cpuPercent = float.NaN; }
         }
 
+        private void HandleCameraNavigation()
+        {
+            Camera cam = GetActiveCamera();
+            if (cam == null || PointerOverPanel()) return;
+            if (!cameraInitialized)
+            {
+                cameraPivot = cam.transform.position + cam.transform.forward * 8f;
+                cameraDistance = Mathf.Max(1f, Vector3.Distance(cam.transform.position, cameraPivot));
+                Vector3 angles = cam.transform.eulerAngles; cameraYaw = angles.y; cameraPitch = angles.x;
+                cameraInitialized = true;
+            }
+            Vector2 pointer = PointerPosition();
+            Vector2 delta = pointer - previousPointer;
+            previousPointer = pointer;
+            bool middle = MiddleHeld();
+            if (middle)
+            {
+                bool shift = ShiftHeld();
+                if (shift)
+                {
+                    Vector3 right = cam.transform.right, up = cam.transform.up;
+                    float pan = cameraDistance * 0.0025f;
+                    cameraPivot -= (right * delta.x + up * delta.y) * pan;
+                }
+                else
+                {
+                    cameraYaw += delta.x * 0.35f;
+                    cameraPitch = Mathf.Clamp(cameraPitch - delta.y * 0.35f, -89f, 89f);
+                }
+            }
+            float wheel = MouseWheel();
+            if (Mathf.Abs(wheel) > 0.001f) cameraDistance = Mathf.Clamp(cameraDistance * Mathf.Pow(0.8f, wheel), 0.5f, 200f);
+            Quaternion rotation = Quaternion.Euler(cameraPitch, cameraYaw, 0f);
+            cam.transform.SetPositionAndRotation(cameraPivot - rotation * Vector3.forward * cameraDistance, rotation);
+        }
+
+        private static bool MiddleHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Mouse.current != null && Mouse.current.middleButton.isPressed;
+#else
+            return Input.GetMouseButton(2);
+#endif
+        }
+        private static bool ShiftHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+#else
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+#endif
+        }
+        private static float MouseWheel()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current == null) return 0f;
+            // Input System versions/devices may report either wheel ticks (1) or
+            // legacy-style units (120). Normalize both to a single tick value.
+            float value = Mouse.current.scroll.ReadValue().y;
+            return Mathf.Abs(value) > 10f ? value / 120f : value;
+#else
+            return Input.mouseScrollDelta.y;
+#endif
+        }
+
         private void HandleSelectionAndDragging()
         {
             // IMGUI does not create an EventSystem pointer event. Use the actual panel rectangle,
@@ -135,6 +206,7 @@ namespace RadiationSimulation
             if (PointerOverPanel()) return;
             bool down = PointerDown();
             bool held = PointerHeld();
+            if (MiddleHeld()) { dragging = false; return; }
             if (down)
             {
                 Camera cam = GetActiveCamera();
@@ -192,7 +264,7 @@ namespace RadiationSimulation
 
         private static Component FindSelectable(Collider c)
         {
-            Type[] types = { typeof(RadiationDosimeter), typeof(RadiationSource), typeof(RadiationMagnet), typeof(AttenuatingRadiationBarrier), typeof(RadiationMirror), typeof(RadiationSpeedReducer), typeof(CriticalRadiationObject) };
+            Type[] types = { typeof(RadiationDosimeter), typeof(RadiationDosimeterField), typeof(RadiationSource), typeof(RadiationMagnet), typeof(AttenuatingRadiationBarrier), typeof(RadiationMirror), typeof(RadiationSpeedReducer), typeof(CriticalRadiationObject) };
             foreach (Type t in types) { Component x = c.GetComponentInParent(t); if (x != null) return x; }
             return null;
         }
@@ -248,6 +320,12 @@ namespace RadiationSimulation
             if (selectedObject != null) selectionMarker = SelectionHighlight.Create(selectedObject.gameObject, SelectionColor);
         }
         private void ClearMarker() { if (selectionMarker != null) Destroy(selectionMarker); selectionMarker = null; }
+        private void RefreshSelectionMarker()
+        {
+            if (selectedObject == null) return;
+            ClearMarker();
+            selectionMarker = SelectionHighlight.Create(selectedObject.gameObject, SelectionColor);
+        }
 
         private void OnGUI()
         {
@@ -365,12 +443,27 @@ namespace RadiationSimulation
             float rot = GUILayout.HorizontalSlider(selectedObject.transform.eulerAngles.y, 0f, 360f, sliderStyle, sliderThumbStyle);
             selectedObject.transform.rotation = Quaternion.Euler(0f, rot, 0f);
 
+            Vector3 scale = selectedObject.transform.localScale;
+            GUILayout.Label($"Размер: X {scale.x:0.00} | Y {scale.y:0.00} | Z {scale.z:0.00}", labelStyle);
+            float sx = GUILayout.HorizontalSlider(scale.x, 0.05f, 10f, sliderStyle, sliderThumbStyle);
+            float sy = GUILayout.HorizontalSlider(scale.y, 0.05f, 10f, sliderStyle, sliderThumbStyle);
+            float sz = GUILayout.HorizontalSlider(scale.z, 0.05f, 10f, sliderStyle, sliderThumbStyle);
+            if (!Mathf.Approximately(sx, scale.x) || !Mathf.Approximately(sy, scale.y) || !Mathf.Approximately(sz, scale.z))
+            {
+                selectedObject.transform.localScale = new Vector3(sx, sy, sz);
+                RefreshSelectionMarker();
+            }
+
             GUILayout.Space(4);
             if (selectedObject is RadiationDosimeter dosimeter)
             {
                 GUILayout.Label($"Дозиметр | доза {dosimeter.Dose:0.00} / {dosimeter.DoseToRed:0.00}", labelStyle);
+                float doseLimit = GUILayout.HorizontalSlider(dosimeter.DoseToRed, 0.01f, 100f, sliderStyle, sliderThumbStyle);
+                bool selectable = GUILayout.Toggle(dosimeter.Selectable, "Доступен для выбора", buttonStyle);
+                if (!Mathf.Approximately(doseLimit, dosimeter.DoseToRed) || selectable != dosimeter.Selectable) dosimeter.Configure(doseLimit, selectable);
                 if (GUILayout.Button("Сбросить дозу", buttonStyle)) dosimeter.ResetDose();
             }
+            else if (selectedObject is RadiationDosimeterField field) DrawField(field);
             else if (selectedObject is RadiationSource source) DrawSource(source);
             else if (selectedObject is RadiationMagnet magnet) DrawMagnet(magnet);
             else if (selectedObject is AttenuatingRadiationBarrier barrier)
@@ -379,6 +472,7 @@ namespace RadiationSimulation
                 barrier.density = GUILayout.HorizontalSlider(barrier.density, 0f, 10f, sliderStyle, sliderThumbStyle);
                 GUILayout.Label($"Коэффициент ослабления: {barrier.attenuationCoefficient:0.00}", mutedStyle);
                 barrier.attenuationCoefficient = GUILayout.HorizontalSlider(barrier.attenuationCoefficient, 0f, 10f, sliderStyle, sliderThumbStyle);
+                barrier.normalThickness = GUILayout.HorizontalSlider(barrier.normalThickness, 0f, 10f, sliderStyle, sliderThumbStyle);
                 barrier.opaque = GUILayout.Toggle(barrier.opaque, "Непрозрачная стена", buttonStyle);
             }
             else if (selectedObject is RadiationMirror mirror)
@@ -396,13 +490,32 @@ namespace RadiationSimulation
             else if (selectedObject is CriticalRadiationObject critical)
             {
                 GUILayout.Label($"Критический объект | доза {critical.AccumulatedDose:0.00} / {critical.CriticalDose:0.00}", labelStyle);
+                float criticalDose = GUILayout.HorizontalSlider(critical.CriticalDose, .01f, 100f, sliderStyle, sliderThumbStyle);
+                float emissionRate = GUILayout.HorizontalSlider(critical.ActivatedEmissionRate, 0f, 200f, sliderStyle, sliderThumbStyle);
+                float intensity = GUILayout.HorizontalSlider(critical.ActivatedIntensity, 0f, 20f, sliderStyle, sliderThumbStyle);
+                float doseRate = GUILayout.HorizontalSlider(critical.DosePerIntensitySecond, 0f, 20f, sliderStyle, sliderThumbStyle);
                 critical.DestroyIncomingParticles = GUILayout.Toggle(critical.DestroyIncomingParticles, "Уничтожать входящие частицы", buttonStyle);
+                critical.ConfigureAdvanced(criticalDose, doseRate, emissionRate, intensity, critical.DestroyIncomingParticles);
                 RadiationSource[] emitters = FindObjectsOfType<RadiationSource>();
                 RadiationSource emitter = emitters.Length > 0 ? emitters[0] : null;
                 if (critical.ActivatedSource != null && emitter != null && emitter != critical.ActivatedSource && GUILayout.Button("Синхронизировать частицы с эмиттером", buttonStyle))
                     critical.SyncActivatedSourceFrom(emitter);
             }
             GUILayout.EndVertical();
+        }
+
+        private void DrawField(RadiationDosimeterField f)
+        {
+            GUILayout.Label($"Поле дозиметров | Count {f.Count} | Size {f.SphereSize:0.00}", labelStyle);
+            int count = Mathf.RoundToInt(GUILayout.HorizontalSlider(f.Count, 1f, 400f, sliderStyle, sliderThumbStyle));
+            float size = GUILayout.HorizontalSlider(f.SphereSize, .01f, 2f, sliderStyle, sliderThumbStyle);
+            float spacing = GUILayout.HorizontalSlider(f.Spacing, .01f, 10f, sliderStyle, sliderThumbStyle);
+            float dose = GUILayout.HorizontalSlider(f.DoseToRed, .01f, 100f, sliderStyle, sliderThumbStyle);
+            float smooth = GUILayout.HorizontalSlider(f.ColorSmoothTime, .01f, 5f, sliderStyle, sliderThumbStyle);
+            bool grid = GUILayout.Toggle(f.UseGrid, "Использовать сетку", buttonStyle);
+            if (count != f.Count || !Mathf.Approximately(size, f.SphereSize) || !Mathf.Approximately(spacing, f.Spacing)) f.Configure(count, size, spacing);
+            if (grid != f.UseGrid || !Mathf.Approximately(dose, f.DoseToRed) || !Mathf.Approximately(smooth, f.ColorSmoothTime)) f.ConfigureAdvanced(f.GridCenter, grid, dose, smooth);
+            if (GUILayout.Button("Перестроить поле", buttonStyle)) f.Rebuild();
         }
 
         private void DrawSource(RadiationSource s)
@@ -421,6 +534,15 @@ namespace RadiationSimulation
             if (GUILayout.Button("Сфера", s.FlowShape == RadiationFlowShape.Omnidirectional ? activeButtonStyle : buttonStyle)) s.SetEmission(newRate, s.InitialIntensity, RadiationFlowShape.Omnidirectional);
             GUILayout.EndHorizontal();
             GUILayout.Label($"Variation {variation:0.00}  |  Cone {cone:0}°", mutedStyle);
+            float newVariation = GUILayout.HorizontalSlider(variation, 0f, 1f, sliderStyle, sliderThumbStyle);
+            float newIntensity = GUILayout.HorizontalSlider(s.InitialIntensity, 0f, 20f, sliderStyle, sliderThumbStyle);
+            float newCone = GUILayout.HorizontalSlider(cone, 0f, 180f, sliderStyle, sliderThumbStyle);
+            float newMaxParticles = GUILayout.HorizontalSlider(s.MaxParticles, 1f, 2000f, sliderStyle, sliderThumbStyle);
+            float newReferenceDistance = GUILayout.HorizontalSlider(s.ReferenceDistance, 0.01f, 20f, sliderStyle, sliderThumbStyle);
+            float newMinSize = GUILayout.HorizontalSlider(s.MinParticleSize, 0.001f, 0.5f, sliderStyle, sliderThumbStyle);
+            float newMaxSize = GUILayout.HorizontalSlider(s.MaxParticleSize, 0.001f, 1f, sliderStyle, sliderThumbStyle);
+            float newRadius = GUILayout.HorizontalSlider(s.ParticleRadius, 0.0001f, 0.5f, sliderStyle, sliderThumbStyle);
+            s.ConfigureAdvanced(newMaxParticles, newVariation, newIntensity, newReferenceDistance, newCone, newMinSize, newMaxSize, newRadius);
         }
 
         private void DrawMagnet(RadiationMagnet m)
@@ -434,7 +556,11 @@ namespace RadiationSimulation
             if (GUILayout.Button("Притяжение", polarity == RadiationMagnetPolarity.Attract ? activeButtonStyle : buttonStyle)) polarity = RadiationMagnetPolarity.Attract;
             if (GUILayout.Button("Отталкивание", polarity == RadiationMagnetPolarity.Repel ? activeButtonStyle : buttonStyle)) polarity = RadiationMagnetPolarity.Repel;
             GUILayout.EndHorizontal();
-            m.ConfigureProperties(radius, strength, falloff, polarity, m.AffectParticlesOutsideRadius);
+            bool outsideRadius = GUILayout.Toggle(m.AffectParticlesOutsideRadius, "Действует вне радиуса", buttonStyle);
+            float maxAcceleration = GUILayout.HorizontalSlider(m.MaxAcceleration, 0f, 200f, sliderStyle, sliderThumbStyle);
+            float maxParticleSpeed = GUILayout.HorizontalSlider(m.MaxParticleSpeed, 0f, 100f, sliderStyle, sliderThumbStyle);
+            m.ConfigureProperties(radius, strength, falloff, polarity, outsideRadius);
+            m.ConfigureLimits(maxAcceleration, maxParticleSpeed);
         }
 
         private static float GetFloat(object o, string name, float fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(float) ? (float)p.GetValue(o) : fallback; }

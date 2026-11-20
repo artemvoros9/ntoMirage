@@ -88,6 +88,19 @@ namespace RadiationSimulation
             initialIntensity = Mathf.Max(0f, intensity);
         }
 
+        public void ConfigureAdvanced(float newMaxParticles, float newVariation, float newIntensity, float newReferenceDistance,
+            float newConeAngle, float newMinParticleSize, float newMaxParticleSize, float newParticleRadius)
+        {
+            maxParticles = Mathf.Max(1, Mathf.RoundToInt(newMaxParticles));
+            lifetimeVariation = Mathf.Clamp01(newVariation);
+            initialIntensity = Mathf.Max(0f, newIntensity);
+            referenceDistance = Mathf.Max(.0001f, newReferenceDistance);
+            coneAngle = Mathf.Clamp(newConeAngle, 0f, 180f);
+            minParticleSize = Mathf.Max(.001f, newMinParticleSize);
+            maxParticleSize = Mathf.Max(minParticleSize, newMaxParticleSize);
+            particleRadius = Mathf.Max(.0001f, newParticleRadius);
+        }
+
         private void Update()
         {
             if (emissionRate <= 0f) return;
