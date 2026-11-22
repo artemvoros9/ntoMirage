@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace RadiationSimulation
 {
+    /// <summary>Configurable grid of physical dose-monitoring spheres.</summary>
     public sealed class RadiationDosimeterField : MonoBehaviour
     {
         [SerializeField, Min(1)] private int count = 25;

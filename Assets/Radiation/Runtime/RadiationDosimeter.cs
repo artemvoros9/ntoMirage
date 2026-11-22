@@ -2,6 +2,7 @@ using UnityEngine;
 
 namespace RadiationSimulation
 {
+    /// <summary>Accumulated dose receiver. Dose is added only by particle intersections.</summary>
     [RequireComponent(typeof(Collider))]
     public sealed class RadiationDosimeter : MonoBehaviour, IRadiationInteraction
     {

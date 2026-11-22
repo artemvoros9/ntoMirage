@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 
 namespace RadiationSimulation
 {
+    /// <summary>Loads and configures the three assessment presets without changing the UI controller.</summary>
     public static class RadiationScenarioFactory
     {
         private static readonly string[] SceneNames = {
@@ -15,6 +16,7 @@ namespace RadiationSimulation
 
         public static void Load(int index)
         {
+            // Controller's index 0 is the authored/original demo; indices 1..3 are the assessed presets.
             if (index <= 0) { Time.timeScale = 1f; SceneManager.LoadScene("RadiationDemo"); return; }
             pendingPreset = Mathf.Clamp(index - 1, 0, SceneNames.Length - 1);
             SceneManager.sceneLoaded -= ConfigureLoadedScene;
