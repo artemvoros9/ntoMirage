@@ -25,7 +25,11 @@ namespace RadiationSimulation
         public bool AffectParticlesOutsideRadius => affectParticlesOutsideRadius;
 
         public void Configure(float newRadius, float newStrength, RadiationMagnetPolarity newPolarity)
-        { radius = Mathf.Max(.01f, newRadius); strength = Mathf.Max(0f, newStrength); polarity = newPolarity; }
+        {
+            radius = Mathf.Max(.01f, newRadius);
+            strength = Mathf.Max(0f, newStrength);
+            polarity = newPolarity;
+        }
 
         public void ConfigureProperties(float newRadius, float newStrength, float newFalloff, RadiationMagnetPolarity newPolarity, bool outsideRadius)
         {
@@ -36,9 +40,23 @@ namespace RadiationSimulation
             affectParticlesOutsideRadius = outsideRadius;
         }
         public void ConfigureLimits(float acceleration, float particleSpeed)
-        { maxAcceleration = Mathf.Max(0f, acceleration); maxParticleSpeed = Mathf.Max(0f, particleSpeed); }
-        private void OnEnable() { if (!ActiveMagnets.Contains(this)) ActiveMagnets.Add(this); }
-        private void OnDisable() => ActiveMagnets.Remove(this);
+        {
+            maxAcceleration = Mathf.Max(0f, acceleration);
+            maxParticleSpeed = Mathf.Max(0f, particleSpeed);
+        }
+
+        private void OnEnable()
+        {
+            if (!ActiveMagnets.Contains(this))
+            {
+                ActiveMagnets.Add(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            ActiveMagnets.Remove(this);
+        }
 
         public static Vector3 EvaluateAcceleration(Vector3 position, Vector3 velocity, RadiationParticle particle)
         {
@@ -46,7 +64,11 @@ namespace RadiationSimulation
             for (int i = ActiveMagnets.Count - 1; i >= 0; i--)
             {
                 var m = ActiveMagnets[i];
-                if (m == null || !m.isActiveAndEnabled) { ActiveMagnets.RemoveAt(i); continue; }
+                if (m == null || !m.isActiveAndEnabled)
+                {
+                    ActiveMagnets.RemoveAt(i);
+                    continue;
+                }
                 Vector3 offset = position - m.transform.position;
                 float d = offset.magnitude;
                 if (!m.affectParticlesOutsideRadius && d > m.radius) continue;
@@ -69,7 +91,20 @@ namespace RadiationSimulation
             for (int i = 0; i < ActiveMagnets.Count; i++) if (ActiveMagnets[i] != null && ActiveMagnets[i].isActiveAndEnabled) max = Mathf.Min(max, ActiveMagnets[i].maxParticleSpeed);
             return max;
         }
-        private void OnValidate() { radius = Mathf.Max(.01f, radius); strength = Mathf.Max(0f, strength); maxAcceleration = Mathf.Max(0f, maxAcceleration); }
-        private void OnDrawGizmosSelected() { Gizmos.color = polarity == RadiationMagnetPolarity.Attract ? new Color(.1f,.4f,1f,.3f) : new Color(1f,.15f,.1f,.3f); Gizmos.DrawWireSphere(transform.position, radius); Gizmos.DrawLine(transform.position, transform.position + transform.up * .5f); }
+        private void OnValidate()
+        {
+            radius = Mathf.Max(.01f, radius);
+            strength = Mathf.Max(0f, strength);
+            maxAcceleration = Mathf.Max(0f, maxAcceleration);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = polarity == RadiationMagnetPolarity.Attract
+                ? new Color(.1f, .4f, 1f, .3f)
+                : new Color(1f, .15f, .1f, .3f);
+            Gizmos.DrawWireSphere(transform.position, radius);
+            Gizmos.DrawLine(transform.position, transform.position + transform.up * .5f);
+        }
     }
 }

@@ -47,7 +47,11 @@ namespace RadiationSimulation
 
         private void Awake()
         {
-            if (instance != null && instance != this) { Destroy(gameObject); return; }
+            if (instance != null && instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
             instance = this;
             DontDestroyOnLoad(gameObject);
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -57,7 +61,10 @@ namespace RadiationSimulation
 
         private void OnDestroy()
         {
-            if (instance == this) instance = null;
+            if (instance == this)
+            {
+                instance = null;
+            }
             SceneManager.sceneLoaded -= OnSceneLoaded;
             ClearMarker();
             ClearGuiTextures();
@@ -72,15 +79,44 @@ namespace RadiationSimulation
             interactionCollidersReady = false;
             cameraInitialized = false;
             Time.timeScale = simulationSpeed;
+            EnsureDosimeterFieldForDemoScene();
+        }
+
+        private static void EnsureDosimeterFieldForDemoScene()
+        {
+            if (FindObjectOfType<RadiationDosimeterField>() != null) return;
+            GameObject floor = GameObject.Find("Demo Floor");
+            if (floor == null) return;
+            Bounds bounds = new Bounds(floor.transform.position, Vector3.one);
+            Renderer floorRenderer = floor.GetComponent<Renderer>();
+            if (floorRenderer != null) bounds = floorRenderer.bounds;
+            else
+            {
+                Collider floorCollider = floor.GetComponent<Collider>();
+                if (floorCollider != null) bounds = floorCollider.bounds;
+            }
+            GameObject fieldObject = new GameObject("Radiation Dosimeter 3D Grid");
+            RadiationDosimeterField field = fieldObject.AddComponent<RadiationDosimeterField>();
+            field.ConfigureGrid(new Vector3(Mathf.Max(1f, bounds.size.x - 2f), .01f, Mathf.Max(1f, bounds.size.z - 2f)),
+                new Vector3(bounds.center.x, bounds.max.y + .12f, bounds.center.z), 2f, .22f);
         }
 
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
             fpsTimer += dt; frames++;
-            if (fpsTimer >= 0.25f) { fps = frames / fpsTimer; frames = 0; fpsTimer = 0f; }
+            if (fpsTimer >= 0.25f)
+            {
+                fps = frames / fpsTimer;
+                frames = 0;
+                fpsTimer = 0f;
+            }
             timingTimer += dt;
-            if (timingTimer >= 0.5f) { UpdateTimings(timingTimer); timingTimer = 0f; }
+            if (timingTimer >= 0.5f)
+            {
+                UpdateTimings(timingTimer);
+                timingTimer = 0f;
+            }
             sceneCountersTimer += dt;
             if (sceneCountersTimer >= 1f)
             {
@@ -206,7 +242,11 @@ namespace RadiationSimulation
             if (PointerOverPanel()) return;
             bool down = PointerDown();
             bool held = PointerHeld();
-            if (MiddleHeld()) { dragging = false; return; }
+            if (MiddleHeld())
+            {
+                dragging = false;
+                return;
+            }
             if (down)
             {
                 Camera cam = GetActiveCamera();
@@ -233,7 +273,11 @@ namespace RadiationSimulation
                     }
                 }
             }
-            if (!held) { dragging = false; return; }
+            if (!held)
+            {
+                dragging = false;
+                return;
+            }
             if (!dragging || selectedObject == null) return;
             Camera activeCamera = GetActiveCamera();
             if (activeCamera == null) return;
@@ -319,7 +363,15 @@ namespace RadiationSimulation
             ClearMarker();
             if (selectedObject != null) selectionMarker = SelectionHighlight.Create(selectedObject.gameObject, SelectionColor);
         }
-        private void ClearMarker() { if (selectionMarker != null) Destroy(selectionMarker); selectionMarker = null; }
+        private void ClearMarker()
+        {
+            if (selectionMarker != null)
+            {
+                Destroy(selectionMarker);
+            }
+
+            selectionMarker = null;
+        }
         private void RefreshSelectionMarker()
         {
             if (selectedObject == null) return;
@@ -361,11 +413,23 @@ namespace RadiationSimulation
             GUILayout.BeginVertical(cardStyle);
             GUILayout.Label("СИМУЛЯЦИЯ", sectionStyle);
             bool newPaused = GUILayout.Toggle(paused, paused ? "▶  Продолжить" : "Ⅱ  Пауза", buttonStyle);
-            if (newPaused != paused) { paused = newPaused; Time.timeScale = paused ? 0f : simulationSpeed; }
+            if (newPaused != paused)
+            {
+                paused = newPaused;
+                Time.timeScale = paused ? 0f : simulationSpeed;
+            }
             GUILayout.Space(4);
             GUILayout.Label($"Скорость: {simulationSpeed:0.00}x", labelStyle);
             float speed = GUILayout.HorizontalSlider(simulationSpeed, 0.1f, 3f, sliderStyle, sliderThumbStyle);
-            if (!Mathf.Approximately(speed, simulationSpeed)) { simulationSpeed = speed; if (!paused) Time.timeScale = simulationSpeed; }
+            if (!Mathf.Approximately(speed, simulationSpeed))
+            {
+                simulationSpeed = speed;
+
+                if (!paused)
+                {
+                    Time.timeScale = simulationSpeed;
+                }
+            }
             GUILayout.Space(4);
             if (GUILayout.Button("Перезагрузить сцену", buttonStyle))
             {
@@ -377,11 +441,30 @@ namespace RadiationSimulation
             GUILayout.EndVertical();
 
             DrawScenarioButtons();
+            DrawDosimeterFieldMenu();
             DrawSelectedInspector();
 
             GUILayout.EndScrollView();
             GUI.skin.verticalScrollbarThumb = prevThumb;
             GUILayout.EndArea();
+        }
+
+        private void DrawDosimeterFieldMenu()
+        {
+            RadiationDosimeterField field = FindObjectOfType<RadiationDosimeterField>();
+            if (field == null) return;
+            GUILayout.BeginVertical(cardStyle);
+            GUILayout.Label("ДОЗИМЕТРЫ НА DEMO FLOOR", sectionStyle);
+            GUILayout.Label($"Сфер: {field.Count} | Размер: {field.SphereSize:0.00} | Расстояние: {field.Spacing:0.00}", labelStyle);
+            int count = Mathf.RoundToInt(GUILayout.HorizontalSlider(field.DosimeterCount, 1f, 1000f, sliderStyle, sliderThumbStyle));
+            GUILayout.Label($"Количество: {count}", mutedStyle);
+            float size = GUILayout.HorizontalSlider(field.SphereSize, .01f, 2f, sliderStyle, sliderThumbStyle);
+            GUILayout.Label($"Размер сферы: {size:0.00}", mutedStyle);
+            float spacing = GUILayout.HorizontalSlider(field.Spacing, .05f, 10f, sliderStyle, sliderThumbStyle);
+            GUILayout.Label($"Расстояние между сферами: {spacing:0.00}", mutedStyle);
+            if (count != field.DosimeterCount || !Mathf.Approximately(size, field.SphereSize) || !Mathf.Approximately(spacing, field.Spacing)) field.Configure(count, size, spacing);
+            if (GUILayout.Button("Перестроить дозиметры на полу", buttonStyle)) field.Rebuild();
+            GUILayout.EndVertical();
         }
 
         private static string FormatMs(float v) => float.IsNaN(v) ? "N/A" : v.ToString("0.0") + " ms";
@@ -399,7 +482,11 @@ namespace RadiationSimulation
                 {
                     int i = row * 2 + col;
                     GUIStyle style = IsScenarioScene(activeScene, i) ? activeButtonStyle : buttonStyle;
-                    if (GUILayout.Button("Сценарий " + i, style)) InvokeFactoryLoad(i);
+                    string[] names = { "Бетон и затухание", "Коробка: зеркало + магнит", "Вторичная эмиссия" };
+                    if (GUILayout.Button(i == 0 ? "Базовая сцена" : names[i - 1], style))
+                    {
+                        LoadScenarioScene(i);
+                    }
                 }
                 GUILayout.EndHorizontal();
             }
@@ -415,12 +502,22 @@ namespace RadiationSimulation
             _ => false
         };
 
-        private static void InvokeFactoryLoad(int index)
+        private static void LoadScenarioScene(int index)
         {
-            Type t = Type.GetType("RadiationSimulation.RadiationScenarioFactory") ?? Type.GetType("RadiationScenarioFactory");
-            MethodInfo m = t?.GetMethod("Load", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(int) }, null);
-            if (m != null) m.Invoke(null, new object[] { index });
-            else Debug.LogWarning("RadiationScenarioFactory.Load(int) не найден.");
+            string[] sceneNames =
+            {
+                "RadiationDemo",
+                "Scenario_ConcreteAttenuation",
+                "Scenario_MirrorMagnet",
+                "Scenario_SecondaryEmission"
+            };
+
+            if (index < 0 || index >= sceneNames.Length)
+            {
+                return;
+            }
+
+            SceneManager.LoadScene(sceneNames[index]);
         }
 
         private void DrawSelectedInspector()
@@ -506,14 +603,19 @@ namespace RadiationSimulation
 
         private void DrawField(RadiationDosimeterField f)
         {
-            GUILayout.Label($"Поле дозиметров | Count {f.Count} | Size {f.SphereSize:0.00}", labelStyle);
-            int count = Mathf.RoundToInt(GUILayout.HorizontalSlider(f.Count, 1f, 400f, sliderStyle, sliderThumbStyle));
+            GUILayout.Label($"3D поле дозиметров | {f.Count} сфер | Size {f.GridSize} | Spacing {f.Spacing:0.00}", labelStyle);
+            int count = Mathf.RoundToInt(GUILayout.HorizontalSlider(f.DosimeterCount, 1f, 1000f, sliderStyle, sliderThumbStyle));
+            Vector3 gridSize = f.GridSize;
+            gridSize.x = GUILayout.HorizontalSlider(gridSize.x, .1f, 100f, sliderStyle, sliderThumbStyle);
+            gridSize.y = GUILayout.HorizontalSlider(gridSize.y, .1f, 100f, sliderStyle, sliderThumbStyle);
+            gridSize.z = GUILayout.HorizontalSlider(gridSize.z, .1f, 100f, sliderStyle, sliderThumbStyle);
             float size = GUILayout.HorizontalSlider(f.SphereSize, .01f, 2f, sliderStyle, sliderThumbStyle);
             float spacing = GUILayout.HorizontalSlider(f.Spacing, .01f, 10f, sliderStyle, sliderThumbStyle);
             float dose = GUILayout.HorizontalSlider(f.DoseToRed, .01f, 100f, sliderStyle, sliderThumbStyle);
             float smooth = GUILayout.HorizontalSlider(f.ColorSmoothTime, .01f, 5f, sliderStyle, sliderThumbStyle);
-            bool grid = GUILayout.Toggle(f.UseGrid, "Использовать сетку", buttonStyle);
-            if (count != f.Count || !Mathf.Approximately(size, f.SphereSize) || !Mathf.Approximately(spacing, f.Spacing)) f.Configure(count, size, spacing);
+            bool grid = GUILayout.Toggle(f.UseGrid, "Использовать 3D сетку", buttonStyle);
+            if (count != f.DosimeterCount) f.ConfigureCount(count);
+            if (gridSize != f.GridSize || !Mathf.Approximately(size, f.SphereSize) || !Mathf.Approximately(spacing, f.Spacing)) f.ConfigureGrid(gridSize, f.GridCenter, spacing, size);
             if (grid != f.UseGrid || !Mathf.Approximately(dose, f.DoseToRed) || !Mathf.Approximately(smooth, f.ColorSmoothTime)) f.ConfigureAdvanced(f.GridCenter, grid, dose, smooth);
             if (GUILayout.Button("Перестроить поле", buttonStyle)) f.Rebuild();
         }
@@ -563,8 +665,29 @@ namespace RadiationSimulation
             m.ConfigureLimits(maxAcceleration, maxParticleSpeed);
         }
 
-        private static float GetFloat(object o, string name, float fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(float) ? (float)p.GetValue(o) : fallback; }
-        private static int GetInt(object o, string name, int fallback) { PropertyInfo p = o.GetType().GetProperty(name); return p != null && p.PropertyType == typeof(int) ? (int)p.GetValue(o) : fallback; }
+        private static float GetFloat(object o, string name, float fallback)
+        {
+            PropertyInfo property = o.GetType().GetProperty(name);
+
+            if (property != null && property.PropertyType == typeof(float))
+            {
+                return (float)property.GetValue(o);
+            }
+
+            return fallback;
+        }
+
+        private static int GetInt(object o, string name, int fallback)
+        {
+            PropertyInfo property = o.GetType().GetProperty(name);
+
+            if (property != null && property.PropertyType == typeof(int))
+            {
+                return (int)property.GetValue(o);
+            }
+
+            return fallback;
+        }
 
         private void EnsureStyles()
         {
@@ -871,7 +994,11 @@ namespace RadiationSimulation
 
         private void LateUpdate()
         {
-            if (target == null) { Destroy(gameObject); return; }
+            if (target == null)
+            {
+                Destroy(gameObject);
+                return;
+            }
             bool active = target.gameObject.activeInHierarchy;
             if (lines != null)
             {
@@ -883,7 +1010,10 @@ namespace RadiationSimulation
 
         private void OnDestroy()
         {
-            if (material != null) Destroy(material);
+            if (material != null)
+            {
+                Destroy(material);
+            }
         }
     }
 
@@ -898,12 +1028,15 @@ namespace RadiationSimulation
                 var controller = new GameObject("Radiation Sandbox Controller");
                 controller.AddComponent<RadiationSandboxController>();
             }
-
-            if (UnityEngine.Object.FindObjectOfType<RadiationSource>() == null || UnityEngine.Object.FindObjectOfType<RadiationDosimeterField>() != null) return;
-            var fieldObject = new GameObject("Radiation Dosimeter Field");
-            fieldObject.AddComponent<RadiationDosimeterField>();
-
-            // Critical objects and their inactive local sources are authored directly in scenes/prefabs.
+            // The controller's sceneLoaded callback is not invoked for the initial scene.
+            var floor = GameObject.Find("Demo Floor");
+            if (floor != null && UnityEngine.Object.FindObjectOfType<RadiationDosimeterField>() == null)
+            {
+                var bounds = floor.GetComponent<Renderer>() != null ? floor.GetComponent<Renderer>().bounds : new Bounds(floor.transform.position, Vector3.one);
+                var fieldObject = new GameObject("Radiation Dosimeter 3D Grid");
+                var field = fieldObject.AddComponent<RadiationDosimeterField>();
+                field.ConfigureGrid(new Vector3(Mathf.Max(1f, bounds.size.x - 2f), .01f, Mathf.Max(1f, bounds.size.z - 2f)), new Vector3(bounds.center.x, bounds.max.y + .12f, bounds.center.z), 2f, .22f);
+            }
         }
     }
 }

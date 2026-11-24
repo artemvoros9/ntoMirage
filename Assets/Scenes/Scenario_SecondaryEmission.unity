@@ -149,15 +149,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationSource
   particlePrefab: {fileID: 7100000000000001, guid: 8d95ad55c7e976546beddf29acebc625, type: 3}
-  emissionRate: 40
+  emissionRate: 50
   maxParticles: 500
-  particleSpeed: 8
-  lifetime: 6
-  lifetimeVariation: 0.25
-  initialIntensity: 1
+  particleSpeed: 7
+  lifetime: 7
+  lifetimeVariation: 0.2
+  initialIntensity: 2
   referenceDistance: 1
-  flowShape: 0
-  coneAngle: 30
+  flowShape: 1
+  coneAngle: 18
   collisionMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -931,6 +931,152 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &840049952
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 840049954}
+  - component: {fileID: 840049953}
+  m_Layer: 0
+  m_Name: Activated Source
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &840049953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840049952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63718cd705018434fb8df62549e9f65c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationSource
+  particlePrefab: {fileID: 0}
+  emissionRate: 40
+  maxParticles: 500
+  particleSpeed: 8
+  lifetime: 6
+  lifetimeVariation: 0.25
+  initialIntensity: 1
+  referenceDistance: 1
+  flowShape: 0
+  coneAngle: 30
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  minimumIntensity: 0.001
+  collisionSkin: 0.002
+  minParticleSize: 0.015
+  maxParticleSize: 0.06
+  particleRadius: 0.01
+--- !u!4 &840049954
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840049952}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &907310784
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 907310786}
+  - component: {fileID: 907310785}
+  m_Layer: 0
+  m_Name: Radiation Dosimeter 3D Grid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &907310785
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 907310784}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: adba932410427034ca75a920209e162e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationDosimeterField
+  sphereSize: 0.22
+  spacing: 2
+  gridSize: {x: 16, y: 0.01, z: 16}
+  gridCenter: {x: 0, y: 0.12, z: 1}
+  useGrid: 1
+  dosimeterCount: 81
+  maximumDosimeters: 100000
+  doseToRed: 10
+  colorSmoothTime: 0.25
+  doseGradient:
+    serializedVersion: 2
+    key0: {r: 0.05, g: 0.25, b: 1, a: 1}
+    key1: {r: 0, g: 1, b: 1, a: 1}
+    key2: {r: 1, g: 0.92156863, b: 0.015686275, a: 0}
+    key3: {r: 1, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 19661
+    ctime2: 42598
+    ctime3: 65535
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 4
+    m_NumAlphaKeys: 2
+  sphereMaterial: {fileID: 0}
+--- !u!4 &907310786
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 907310784}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &948212977
 GameObject:
   m_ObjectHideFlags: 0
@@ -987,7 +1133,7 @@ Transform:
   m_GameObject: {fileID: 948212977}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -7, y: 1.1, z: 0}
+  m_LocalPosition: {x: -7.29, y: 2.1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1025,8 +1171,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ffb80dbc13510be48b8661b59fa8542d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationSpeedReducer
-  speedMultiplier: 0.35
-  intensityLossPerUnit: 0
+  speedMultiplier: 0.3
+  intensityLossPerUnit: 0.08
 --- !u!23 &1132523728
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1114,7 +1260,7 @@ Transform:
   m_GameObject: {fileID: 1132523726}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.4, y: 1.5, z: 0}
+  m_LocalPosition: {x: -5.3, y: 0, z: 0}
   m_LocalScale: {x: 2.2, y: 3, z: 3.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1367,11 +1513,73 @@ Transform:
   m_GameObject: {fileID: 1160506168}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.73788, y: 1.58, z: -1.6296}
+  m_LocalPosition: {x: -2.05, y: 0, z: 2.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 43211456}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1188106612
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1188106614}
+  - component: {fileID: 1188106613}
+  m_Layer: 0
+  m_Name: Activated Source
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1188106613
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1188106612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63718cd705018434fb8df62549e9f65c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationSource
+  particlePrefab: {fileID: 0}
+  emissionRate: 40
+  maxParticles: 500
+  particleSpeed: 8
+  lifetime: 6
+  lifetimeVariation: 0.25
+  initialIntensity: 1
+  referenceDistance: 1
+  flowShape: 0
+  coneAngle: 30
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  minimumIntensity: 0.001
+  collisionSkin: 0.002
+  minParticleSize: 0.015
+  maxParticleSize: 0.06
+  particleRadius: 0.01
+--- !u!4 &1188106614
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1188106612}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1283673957
@@ -1497,8 +1705,141 @@ Transform:
   m_GameObject: {fileID: 1283673957}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.6, y: 1.5, z: 0}
+  m_LocalPosition: {x: -3.36, y: 0, z: 0}
   m_LocalScale: {x: 0.35, y: 3, z: 4}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1334607444
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1334607449}
+  - component: {fileID: 1334607448}
+  - component: {fileID: 1334607447}
+  - component: {fileID: 1334607446}
+  - component: {fileID: 1334607445}
+  m_Layer: 0
+  m_Name: Critical Graphite Rod
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1334607445
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334607444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c09fb68c16b77de42a28487779fb3378, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.CriticalRadiationObject
+  criticalDose: 7
+  dosePerIntensitySecond: 1
+  activatedSource: {fileID: 1188106613}
+  activatedEmissionRate: 25
+  activatedIntensity: 2
+  destroyIncomingParticles: 0
+--- !u!23 &1334607446
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334607444}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!136 &1334607447
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334607444}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 2
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &1334607448
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334607444}
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1334607449
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1334607444}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -2.22, y: 0, z: 0}
+  m_LocalScale: {x: 0.35, y: 1.4, z: 0.35}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1634,7 +1975,7 @@ Transform:
   m_GameObject: {fileID: 1421451312}
   serializedVersion: 2
   m_LocalRotation: {x: 0.32521155, y: 0, z: 0, w: 0.94564134}
-  m_LocalPosition: {x: 0.26, y: 9.49, z: -8.58}
+  m_LocalPosition: {x: 0, y: 6.85, z: -8.78}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2006,6 +2347,50 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!1 &2071225270
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2071225272}
+  - component: {fileID: 2071225271}
+  m_Layer: 0
+  m_Name: Radiation Sandbox Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2071225271
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071225270}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f42830e4ea4760c49b90368db8681914, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadiationSimulation.RadiationSandboxController
+--- !u!4 &2071225272
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071225270}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2020,3 +2405,8 @@ SceneRoots:
   - {fileID: 1421451316}
   - {fileID: 1160506173}
   - {fileID: 580872305}
+  - {fileID: 1334607449}
+  - {fileID: 840049954}
+  - {fileID: 2071225272}
+  - {fileID: 1188106614}
+  - {fileID: 907310786}

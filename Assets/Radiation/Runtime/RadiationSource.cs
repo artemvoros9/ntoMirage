@@ -29,7 +29,10 @@ namespace RadiationSimulation
         private bool warnedMissingPrefab;
         public float InitialIntensity => initialIntensity;
         public float ReferenceDistance => referenceDistance;
-        public float SampleLifetime() => lifetime * Mathf.Lerp(1f - lifetimeVariation, 1f + lifetimeVariation, Random.value);
+        public float SampleLifetime()
+        {
+            return lifetime * Mathf.Lerp(1f - lifetimeVariation, 1f + lifetimeVariation, Random.value);
+        }
         public float MinimumIntensity => minimumIntensity;
         public float CollisionSkin => collisionSkin;
         public float MinParticleSize => minParticleSize;
@@ -45,15 +48,23 @@ namespace RadiationSimulation
         public int ActiveParticleCount => activeParticles.Count;
         public void ConfigureRuntime(float rate, float speed, float life, float variation, float intensity, float cone, RadiationFlowShape shape)
         {
-            emissionRate = Mathf.Max(0f, rate); particleSpeed = Mathf.Max(0.01f, speed); lifetime = Mathf.Max(0.01f, life);
-            lifetimeVariation = Mathf.Clamp01(variation); initialIntensity = Mathf.Max(0f, intensity); coneAngle = Mathf.Clamp(cone, 0f, 180f); flowShape = shape;
+            emissionRate = Mathf.Max(0f, rate);
+            particleSpeed = Mathf.Max(0.01f, speed);
+            lifetime = Mathf.Max(0.01f, life);
+            lifetimeVariation = Mathf.Clamp01(variation);
+            initialIntensity = Mathf.Max(0f, intensity);
+            coneAngle = Mathf.Clamp(cone, 0f, 180f);
+            flowShape = shape;
         }
         [SerializeField, Min(0.0001f)] private float particleRadius = 0.01f;
         public float ParticleRadius => particleRadius;
 
         public void CopyConfigurationFrom(RadiationSource other)
         {
-            if (other == null) return;
+            if (other == null)
+            {
+                return;
+            }
             particlePrefab = other.particlePrefab;
             emissionRate = other.emissionRate;
             maxParticles = other.maxParticles;
@@ -103,7 +114,10 @@ namespace RadiationSimulation
 
         private void Update()
         {
-            if (emissionRate <= 0f) return;
+            if (emissionRate <= 0f)
+            {
+                return;
+            }
             if (particlePrefab == null)
             {
                 if (!warnedMissingPrefab)
@@ -117,7 +131,10 @@ namespace RadiationSimulation
             int available = Mathf.Max(0, maxParticles - activeParticles.Count);
             int count = Mathf.Min(Mathf.FloorToInt(emissionAccumulator), available);
             emissionAccumulator -= count;
-            for (int i = 0; i < count; i++) Emit();
+            for (int i = 0; i < count; i++)
+            {
+                Emit();
+            }
         }
 
         private void Emit()
@@ -131,7 +148,15 @@ namespace RadiationSimulation
                 }
                 return;
             }
-            RadiationParticle particle = pool.Count > 0 ? pool.Dequeue() : Instantiate(particlePrefab);
+            RadiationParticle particle;
+            if (pool.Count > 0)
+            {
+                particle = pool.Dequeue();
+            }
+            else
+            {
+                particle = Instantiate(particlePrefab);
+            }
             // Частица должна двигаться в мировом пространстве и не наследовать движение
             // источника (особенно важно для активированного критического объекта).
             particle.transform.SetParent(null, true);
@@ -142,7 +167,10 @@ namespace RadiationSimulation
 
         private Vector3 SampleDirection()
         {
-            if (flowShape == RadiationFlowShape.Ray) return transform.forward;
+            if (flowShape == RadiationFlowShape.Ray)
+            {
+                return transform.forward;
+            }
             if (flowShape == RadiationFlowShape.Cone)
             {
                 float cos = Mathf.Cos(coneAngle * Mathf.Deg2Rad);
@@ -160,11 +188,17 @@ namespace RadiationSimulation
             return Random.onUnitSphere;
         }
 
-        public float ComputeIntensityAtDistance(float distance, float currentIntensity) => RadiationMath.InverseSquare(currentIntensity, distance, referenceDistance);
+        public float ComputeIntensityAtDistance(float distance, float currentIntensity)
+        {
+            return RadiationMath.InverseSquare(currentIntensity, distance, referenceDistance);
+        }
 
         public void Release(RadiationParticle particle)
         {
-            if (particle == null) return;
+            if (particle == null)
+            {
+                return;
+            }
             activeParticles.Remove(particle);
             pool.Enqueue(particle);
         }
@@ -194,8 +228,14 @@ namespace RadiationSimulation
         {
             Gizmos.color = new Color(1f, 0.65f, 0.1f, 0.35f);
             Gizmos.DrawWireSphere(transform.position, 0.12f);
-            if (flowShape == RadiationFlowShape.Ray) Gizmos.DrawRay(transform.position, transform.forward * 2f);
-            else if (flowShape == RadiationFlowShape.Cone) Gizmos.DrawRay(transform.position, transform.forward * 2f);
+            if (flowShape == RadiationFlowShape.Ray)
+            {
+                Gizmos.DrawRay(transform.position, transform.forward * 2f);
+            }
+            else if (flowShape == RadiationFlowShape.Cone)
+            {
+                Gizmos.DrawRay(transform.position, transform.forward * 2f);
+            }
         }
     }
 }

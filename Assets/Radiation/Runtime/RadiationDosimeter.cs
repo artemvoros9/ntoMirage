@@ -12,11 +12,22 @@ namespace RadiationSimulation
         public float Dose => dose;
         public float DoseToRed => doseToRed;
         public bool Selectable => selectable;
-        public void Configure(float newDoseToRed, bool newSelectable = true) { doseToRed = Mathf.Max(.0001f, newDoseToRed); selectable = newSelectable; }
-        public void ResetDose() => dose = 0f;
+        public void Configure(float newDoseToRed, bool newSelectable = true)
+        {
+            doseToRed = Mathf.Max(.0001f, newDoseToRed);
+            selectable = newSelectable;
+        }
+
+        public void ResetDose()
+        {
+            dose = 0f;
+        }
         public void RegisterIntersection(RadiationParticle particle, float pathLength)
         {
-            if (particle == null || pathLength <= 0f) return;
+            if (particle == null || pathLength <= 0f)
+            {
+                return;
+            }
             float speed = Mathf.Max(.001f, particle.Velocity.magnitude);
             dose += Mathf.Max(0f, particle.Intensity) * pathLength / speed;
         }
@@ -25,6 +36,9 @@ namespace RadiationSimulation
             RegisterIntersection(particle, Mathf.Max(.001f, particle != null ? particle.Velocity.magnitude * Time.fixedDeltaTime : 0f));
             return new RadiationInteractionResult(1f, 1f, false, false);
         }
-        private void OnValidate() => doseToRed = Mathf.Max(.0001f, doseToRed);
+        private void OnValidate()
+        {
+            doseToRed = Mathf.Max(.0001f, doseToRed);
+        }
     }
 }
