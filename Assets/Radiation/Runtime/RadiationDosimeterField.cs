@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace RadiationSimulation
 {
@@ -17,6 +18,10 @@ namespace RadiationSimulation
         [SerializeField, Min(0.01f)] private float colorSmoothTime = 0.25f;
         [SerializeField] private Gradient doseGradient;
         [SerializeField] private Material sphereMaterial;
+        [SerializeField, Tooltip("Экспериментально: рисовать стандартные сферы пачками (до 1023). По умолчанию выключено: внешний вид штатного материала сохраняется. Префабы и собственный материал всегда используют обычные Renderer.")]
+        private bool instanceDefaultSpheres;
+        [SerializeField, Tooltip("URP shader для экспериментального инстансинга; задайте явно, чтобы он не был удалён при сборке. Без него используется обычный Renderer.")]
+        private Shader instancedSphereShader;
         [SerializeField, Tooltip("Prefab модели дозиметра; если не назначен, используется сфера.")]
         private GameObject dosimeterPrefab;
         [SerializeField, Tooltip("Путь от корня модели до дочернего объекта с Renderer. Пусто — Renderer корня или первый дочерний Renderer.")]
@@ -27,6 +32,17 @@ namespace RadiationSimulation
         private readonly List<float> displayedDose = new();
         private readonly List<float> colorVelocity = new();
         private readonly List<Renderer> renderers = new();
+        private Mesh instanceMesh;
+        private Material instanceMaterial;
+        private MaterialPropertyBlock instancePropertyBlock;
+        private bool useInstancedVisuals;
+        private readonly Matrix4x4[] matrixBatch = new Matrix4x4[1023];
+        private readonly List<Vector4> colorBatchValues = new(1023);
+        private readonly List<Vector4> emissionBatchValues = new(1023);
+        private RadiationDosimeter selectedDosimeter;
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
         public int Count => dosimeters.Count;
         public int DosimeterCount => dosimeterCount;
         public float SphereSize => sphereSize;
@@ -138,7 +154,70 @@ namespace RadiationSimulation
             CacheExistingDosimeters();
             ClampDosimetersToDemoFloor();
             // Scene children may have been generated before the prefab was assigned.
+            // Already-authored scene children retain their original renderers;
+            // only freshly generated default spheres are eligible for batching.
             if (dosimeters.Count == 0 || dosimeterPrefab != null) Rebuild();
+        }
+
+        private void OnDestroy()
+        {
+            if (instanceMaterial != null) Destroy(instanceMaterial);
+        }
+
+        private void OnDisable()
+        {
+            if (!useInstancedVisuals) return;
+            foreach (Renderer renderer in renderers)
+                if (renderer != null) renderer.enabled = true;
+        }
+
+        private void OnEnable()
+        {
+            if (!useInstancedVisuals) return;
+            for (int i = 0; i < dosimeters.Count; i++)
+                if (renderers[i] != null) renderers[i].enabled = dosimeters[i] == selectedDosimeter;
+        }
+
+        // The sandbox controller selects a physical dosimeter; leave its renderer
+        // enabled so SelectionHighlight can copy the original mesh and material.
+        public void SetSelectedDosimeter(RadiationDosimeter dosimeter)
+        {
+            if (!useInstancedVisuals) return;
+            if (selectedDosimeter != null && selectedDosimeter != dosimeter)
+            {
+                Renderer previous = selectedDosimeter.GetComponent<Renderer>();
+                if (previous != null) previous.enabled = false;
+            }
+            selectedDosimeter = dosimeter;
+            if (dosimeter != null)
+            {
+                Renderer selected = dosimeter.GetComponent<Renderer>();
+                if (selected != null) selected.enabled = true;
+            }
+        }
+
+        private void ConfigureInstancing()
+        {
+            useInstancedVisuals = false;
+            if (instanceMaterial != null)
+            {
+                if (Application.isPlaying) Destroy(instanceMaterial);
+                else DestroyImmediate(instanceMaterial);
+                instanceMaterial = null;
+            }
+            // Custom models/materials can use multiple meshes or shaders; leave
+            // their original renderers untouched instead of silently changing them.
+            if (!instanceDefaultSpheres || dosimeterPrefab != null || sphereMaterial != null ||
+                !SystemInfo.supportsInstancing) return;
+            // The experimental opaque pass cannot reproduce translucent gradients.
+            // Preserve the original Renderer whenever alpha varies from fully opaque.
+            if (doseGradient != null)
+                foreach (GradientAlphaKey key in doseGradient.alphaKeys)
+                    if (key.alpha < 0.999f) return;
+            Shader shader = instancedSphereShader;
+            if (shader == null || shader.name != "Radiation/Dosimeter Instanced" || !shader.isSupported) return;
+            instanceMaterial = new Material(shader) { enableInstancing = true, hideFlags = HideFlags.DontSave };
+            useInstancedVisuals = true;
         }
 
         private void SnapToDemoFloor()
@@ -223,23 +302,90 @@ namespace RadiationSimulation
         private void Update()
         {
             ClampDosimetersToDemoFloor();
-            for (int i=0; i<dosimeters.Count; i++)
+            if (useInstancedVisuals)
+            {
+                UpdateInstancedVisuals();
+                return;
+            }
+            for (int i = 0; i < dosimeters.Count; i++)
             {
                 if (dosimeters[i] == null || renderers[i] == null) continue;
-                float normalized = Mathf.Clamp01(dosimeters[i].Dose / doseToRed);
-                float velocity = colorVelocity[i];
-                displayedDose[i] = Mathf.SmoothDamp(displayedDose[i], normalized, ref velocity, colorSmoothTime);
-                colorVelocity[i] = velocity;
-                Color color = doseGradient != null
-                    ? doseGradient.Evaluate(displayedDose[i])
-                    : Color.Lerp(Color.blue, Color.red, displayedDose[i]);
-                var block = new MaterialPropertyBlock();
-                renderers[i].GetPropertyBlock(block);
-                block.SetColor("_Color", color);
-                block.SetColor("_BaseColor", color);
-                block.SetColor("_EmissionColor", color * (.15f + displayedDose[i] * 1.5f));
-                renderers[i].SetPropertyBlock(block);
+                Color color = UpdateDisplayedColor(i);
+                if (instancePropertyBlock == null) instancePropertyBlock = new MaterialPropertyBlock();
+                instancePropertyBlock.Clear();
+                renderers[i].GetPropertyBlock(instancePropertyBlock);
+                SetColorProperties(instancePropertyBlock, color, displayedDose[i]);
+                renderers[i].SetPropertyBlock(instancePropertyBlock);
             }
+        }
+
+        private Color UpdateDisplayedColor(int index)
+        {
+            float normalized = dosimeters[index] == null ? 0f : Mathf.Clamp01(dosimeters[index].Dose / doseToRed);
+            float velocity = colorVelocity[index];
+            displayedDose[index] = Mathf.SmoothDamp(displayedDose[index], normalized, ref velocity, colorSmoothTime);
+            colorVelocity[index] = velocity;
+            return doseGradient != null
+                ? doseGradient.Evaluate(displayedDose[index])
+                : Color.Lerp(Color.blue, Color.red, displayedDose[index]);
+        }
+
+        private static void SetColorProperties(MaterialPropertyBlock block, Color color, float dose)
+        {
+            block.SetColor(ColorId, color);
+            block.SetColor(BaseColorId, color);
+            block.SetColor(EmissionColorId, color * (.15f + dose * 1.5f));
+        }
+
+        private void UpdateInstancedVisuals()
+        {
+            if (instanceMesh == null || instanceMaterial == null) return;
+            int count = 0;
+            colorBatchValues.Clear();
+            emissionBatchValues.Clear();
+            for (int i = 0; i < dosimeters.Count; i++)
+            {
+                RadiationDosimeter dosimeter = dosimeters[i];
+                Renderer renderer = renderers[i];
+                if (dosimeter == null || renderer == null || !dosimeter.gameObject.activeInHierarchy) continue;
+                if (renderer.enabled && dosimeter != selectedDosimeter) continue;
+                Color color = UpdateDisplayedColor(i);
+                if (dosimeter == selectedDosimeter)
+                {
+                    // SelectionHighlight reads the original renderer, so keep its
+                    // material and color alive while excluding it from the batch.
+                    if (instancePropertyBlock == null) instancePropertyBlock = new MaterialPropertyBlock();
+                    instancePropertyBlock.Clear();
+                    renderer.GetPropertyBlock(instancePropertyBlock);
+                    SetColorProperties(instancePropertyBlock, color, displayedDose[i]);
+                    renderer.SetPropertyBlock(instancePropertyBlock);
+                    continue;
+                }
+                matrixBatch[count] = dosimeter.transform.localToWorldMatrix;
+                colorBatchValues.Add(color);
+                emissionBatchValues.Add(color * (.15f + displayedDose[i] * 1.5f));
+                count++;
+                if (count == matrixBatch.Length)
+                {
+                    DrawInstanceBatch(count);
+                    count = 0;
+                    colorBatchValues.Clear();
+                    emissionBatchValues.Clear();
+                }
+            }
+            if (count != 0) DrawInstanceBatch(count);
+        }
+
+        private void DrawInstanceBatch(int count)
+        {
+            if (instancePropertyBlock == null) instancePropertyBlock = new MaterialPropertyBlock();
+            instancePropertyBlock.Clear();
+            instancePropertyBlock.SetVectorArray(ColorId, colorBatchValues);
+            instancePropertyBlock.SetVectorArray(BaseColorId, colorBatchValues);
+            instancePropertyBlock.SetVectorArray(EmissionColorId, emissionBatchValues);
+            // Matrix buffer is reused; the color lists contain exactly count entries.
+            Graphics.DrawMeshInstanced(instanceMesh, 0, instanceMaterial, matrixBatch, count, instancePropertyBlock,
+                ShadowCastingMode.On, true, gameObject.layer, null, LightProbeUsage.BlendProbes, null);
         }
         public void ResetDose()
         {
@@ -262,6 +408,9 @@ namespace RadiationSimulation
             }
             dosimeters.Clear(); displayedDose.Clear(); colorVelocity.Clear(); renderers.Clear();
             SnapToDemoFloor();
+            ConfigureInstancing();
+            selectedDosimeter = null;
+            instanceMesh = null;
             int xCount = Mathf.Max(1, Mathf.FloorToInt(gridSize.x / spacing) + 1);
             int yCount = 1;
             int zCount = Mathf.Max(1, Mathf.FloorToInt(gridSize.z / spacing) + 1);
@@ -284,6 +433,11 @@ namespace RadiationSimulation
                 Renderer colorRenderer = ResolveColorRenderer(go.transform);
                 if (dosimeterPrefab == null && sphereMaterial != null && colorRenderer != null)
                     colorRenderer.sharedMaterial = sphereMaterial;
+                if (useInstancedVisuals && colorRenderer is MeshRenderer)
+                {
+                    MeshFilter filter = colorRenderer.GetComponent<MeshFilter>();
+                    if (instanceMesh == null) instanceMesh = filter != null ? filter.sharedMesh : null;
+                }
 
                 // The receiver and its collider stay on the instance root so particle
                 // intersections work even when only the visual mesh is nested.
@@ -296,6 +450,8 @@ namespace RadiationSimulation
                 colorVelocity.Add(0f);
                 renderers.Add(colorRenderer);
                 PlaceOnDemoFloor(go.transform);
+                if (useInstancedVisuals && instanceMesh != null && colorRenderer != null)
+                    colorRenderer.enabled = false;
             }
         }
         private void OnValidate()
