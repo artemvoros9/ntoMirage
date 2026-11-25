@@ -22,9 +22,22 @@ namespace RadiationSimulation
         public float Intensity => source == null ? 0f : source.ComputeIntensityAtDistance(traveledDistance, initialIntensity * transmission);
         public float RemainingLifetime => remainingLifetime;
         public Vector3 Velocity => velocity;
+        public RadiationSource Source => source;
+        public RadiationParticleType ParticleType { get; private set; }
+        public float ChargeToMass => RadiationParticleProperties.ChargeToMass(ParticleType);
+        public float InitialIntensityValue => initialIntensity;
+        public float TraveledDistance => traveledDistance;
+        public float Transmission => transmission;
+
+        /// <summary>Немедленно убрать частицу из симуляции (используется меню частиц).</summary>
+        public void Retire()
+        {
+            Despawn();
+        }
         public void Initialize(RadiationSource owner, Vector3 direction, float speed, float lifetime, float initialValue)
         {
             source = owner;
+            ParticleType = owner != null ? owner.ParticleType : RadiationParticleType.Alpha;
             velocity = (direction.sqrMagnitude > .000001f ? direction.normalized : Vector3.forward) * Mathf.Max(0, speed);
             remainingLifetime = Mathf.Max(0, lifetime);
             initialIntensity = Mathf.Max(0, initialValue);
@@ -98,7 +111,7 @@ namespace RadiationSimulation
             float remain = Time.fixedDeltaTime;
             Collider ignored = null;
             int guard = 0;
-            while(remain>1e-6f&&initialized&&guard++<8)
+            while (remain > 1e-6f && initialized && guard++ < 2048)
             {
                 if (remainingLifetime <= 0)
                 {
@@ -107,12 +120,13 @@ namespace RadiationSimulation
                 }
 
                 float dt = Mathf.Min(remain, remainingLifetime);
-                Vector3 a = RadiationMagnet.EvaluateAcceleration(transform.position, velocity, this);
-                velocity += a * dt;
-                float max = RadiationMagnet.GetMaximumParticleSpeed();
-                if (!float.IsPositiveInfinity(max))
+                Vector3 omega = RadiationMagnet.EvaluateAngularVelocity(transform.position, velocity, this);
+                // A magnetic field rotates velocity without changing its magnitude.
+                // Substeps keep collision casts close to the curved trajectory.
+                if (omega.sqrMagnitude > 1e-12f)
                 {
-                    velocity = Vector3.ClampMagnitude(velocity, max);
+                    dt = Mathf.Min(dt, 0.1f / omega.magnitude);
+                    velocity = Quaternion.AngleAxis(-omega.magnitude * dt * Mathf.Rad2Deg, omega) * velocity;
                 }
 
                 float speedNow = velocity.magnitude;
@@ -342,7 +356,10 @@ namespace RadiationSimulation
                 particleRenderer.GetPropertyBlock(visualBlock);
                 visualBlock.SetColor(
                     "_Color",
-                    new Color(1, 1, 1, Mathf.Clamp01(Intensity / Mathf.Max(.0001f, initialIntensity))));
+                    new Color(ParticleType == RadiationParticleType.Beta ? .3f : 1f,
+                        ParticleType == RadiationParticleType.Beta ? .8f : .7f,
+                        ParticleType == RadiationParticleType.Beta ? 1f : .2f,
+                        Mathf.Clamp01(Intensity / Mathf.Max(.0001f, initialIntensity))));
                 particleRenderer.SetPropertyBlock(visualBlock);
             }
 

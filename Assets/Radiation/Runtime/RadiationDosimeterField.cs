@@ -17,6 +17,12 @@ namespace RadiationSimulation
         [SerializeField, Min(0.01f)] private float colorSmoothTime = 0.25f;
         [SerializeField] private Gradient doseGradient;
         [SerializeField] private Material sphereMaterial;
+        [SerializeField, Tooltip("Prefab модели дозиметра; если не назначен, используется сфера.")]
+        private GameObject dosimeterPrefab;
+        [SerializeField, Tooltip("Путь от корня модели до дочернего объекта с Renderer. Пусто — Renderer корня или первый дочерний Renderer.")]
+        private string colorTargetPath = "";
+        [SerializeField, Tooltip("Необязательно: выберите дочерний Transform внутри prefab вместо указания пути.")]
+        private Transform colorTarget;
         private readonly List<RadiationDosimeter> dosimeters = new();
         private readonly List<float> displayedDose = new();
         private readonly List<float> colorVelocity = new();
@@ -30,6 +36,52 @@ namespace RadiationSimulation
         public bool UseGrid => useGrid;
         public float DoseToRed => doseToRed;
         public float ColorSmoothTime => colorSmoothTime;
+        public GameObject DosimeterPrefab => dosimeterPrefab;
+        public string ColorTargetPath => colorTargetPath;
+        public Transform ColorTarget => colorTarget;
+
+        public void ConfigureVisuals(GameObject prefab, Transform target, string path)
+        {
+            if (target != null && (prefab == null || !target.IsChildOf(prefab.transform)))
+            {
+                Debug.LogWarning("Цветовой объект должен принадлежать prefab дозиметра.", this);
+                return;
+            }
+            path ??= "";
+            if (dosimeterPrefab == prefab && colorTarget == target && colorTargetPath == path) return;
+            dosimeterPrefab = prefab;
+            colorTarget = target;
+            colorTargetPath = path;
+            Rebuild();
+        }
+
+        private Renderer ResolveColorRenderer(Transform root)
+        {
+            Transform target = null;
+            if (dosimeterPrefab != null && colorTarget != null && colorTarget.IsChildOf(dosimeterPrefab.transform))
+            {
+                string relativePath = RelativePath(dosimeterPrefab.transform, colorTarget);
+                target = relativePath.Length == 0 ? root : root.Find(relativePath);
+            }
+            if (target == null && !string.IsNullOrWhiteSpace(colorTargetPath))
+                target = root.Find(colorTargetPath.Trim());
+            if (target != null)
+            {
+                Renderer selected = target.GetComponent<Renderer>();
+                if (selected != null) return selected;
+            }
+            return root.GetComponent<Renderer>() ?? root.GetComponentInChildren<Renderer>(true);
+        }
+
+        private static string RelativePath(Transform root, Transform child)
+        {
+            if (child == root) return "";
+            var names = new List<string>();
+            for (Transform current = child; current != null && current != root; current = current.parent)
+                names.Add(current.name);
+            names.Reverse();
+            return string.Join("/", names);
+        }
         public void Configure(int newCount, float newSize, float newSpacing)
         {
             dosimeterCount = Mathf.Clamp(newCount, 1, maximumDosimeters);
@@ -85,7 +137,8 @@ namespace RadiationSimulation
             SnapToDemoFloor();
             CacheExistingDosimeters();
             ClampDosimetersToDemoFloor();
-            if (dosimeters.Count == 0) Rebuild();
+            // Scene children may have been generated before the prefab was assigned.
+            if (dosimeters.Count == 0 || dosimeterPrefab != null) Rebuild();
         }
 
         private void SnapToDemoFloor()
@@ -93,35 +146,65 @@ namespace RadiationSimulation
             GameObject floor = GameObject.Find("Demo Floor");
             if (floor == null) return;
             Bounds bounds = new Bounds(floor.transform.position, Vector3.one);
+            Collider collider = floor.GetComponent<Collider>();
             Renderer renderer = floor.GetComponent<Renderer>();
-            if (renderer != null) bounds = renderer.bounds;
-            else
-            {
-                Collider collider = floor.GetComponent<Collider>();
-                if (collider != null) bounds = collider.bounds;
-            }
+            if (collider != null) bounds = collider.bounds;
+            else if (renderer != null) bounds = renderer.bounds;
             Vector3 worldCenter = transform.TransformPoint(gridCenter);
-            worldCenter.y = bounds.max.y + sphereSize * .5f;
+            // The grid specifies X/Z only; the actual height depends on each model's geometry.
+            worldCenter.y = bounds.max.y;
             gridCenter = transform.InverseTransformPoint(worldCenter);
         }
         private void ClampDosimetersToDemoFloor()
         {
             GameObject floor = GameObject.Find("Demo Floor");
             if (floor == null) return;
-            Bounds bounds = floor.GetComponent<Renderer>() != null ? floor.GetComponent<Renderer>().bounds : floor.GetComponent<Collider>() != null ? floor.GetComponent<Collider>().bounds : new Bounds(floor.transform.position, Vector3.one);
-            float radius = sphereSize * .5f;
-            float y = bounds.max.y + radius;
-            float minX = bounds.min.x + radius, maxX = bounds.max.x - radius;
-            float minZ = bounds.min.z + radius, maxZ = bounds.max.z - radius;
+            Collider floorCollider = floor.GetComponent<Collider>();
+            Renderer floorRenderer = floor.GetComponent<Renderer>();
+            Bounds bounds = floorCollider != null ? floorCollider.bounds : floorRenderer != null ? floorRenderer.bounds : new Bounds(floor.transform.position, Vector3.one);
+            float margin = Mathf.Max(0.01f, sphereSize * .5f);
+            float minX = bounds.min.x + margin, maxX = bounds.max.x - margin;
+            float minZ = bounds.min.z + margin, maxZ = bounds.max.z - margin;
             for (int i = 0; i < dosimeters.Count; i++)
             {
                 if (dosimeters[i] == null) continue;
-                Vector3 position = dosimeters[i].transform.position;
+                Transform root = dosimeters[i].transform;
+                Vector3 position = root.position;
                 position.x = Mathf.Clamp(position.x, minX, maxX);
-                position.y = y;
                 position.z = Mathf.Clamp(position.z, minZ, maxZ);
-                dosimeters[i].transform.position = position;
+                root.position = position;
+                PlaceOnFloor(root, bounds.max.y);
             }
+        }
+
+        private static void PlaceOnDemoFloor(Transform root)
+        {
+            GameObject floor = GameObject.Find("Demo Floor");
+            if (floor == null) return;
+            Renderer floorRenderer = floor.GetComponent<Renderer>();
+            Collider floorCollider = floor.GetComponent<Collider>();
+            float height = floorCollider != null ? floorCollider.bounds.max.y
+                : floorRenderer != null ? floorRenderer.bounds.max.y : floor.transform.position.y;
+            PlaceOnFloor(root, height);
+        }
+
+        private static void PlaceOnFloor(Transform root, float floorHeight)
+        {
+            // Align the lowest point of the actual model, not its pivot or a size slider.
+            // Ignore particle-trigger colliders: they may deliberately extend beyond the mesh.
+            Renderer[] meshes = root.GetComponentsInChildren<Renderer>(true);
+            float bottom = float.PositiveInfinity;
+            foreach (Renderer mesh in meshes)
+                if (mesh != null) bottom = Mathf.Min(bottom, mesh.bounds.min.y);
+            if (float.IsPositiveInfinity(bottom))
+            {
+                Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+                foreach (Collider collider in colliders)
+                    if (collider != null && !collider.isTrigger)
+                        bottom = Mathf.Min(bottom, collider.bounds.min.y);
+            }
+            if (!float.IsPositiveInfinity(bottom))
+                root.position += Vector3.up * (floorHeight - bottom);
         }
 
         private void CacheExistingDosimeters()
@@ -131,8 +214,8 @@ namespace RadiationSimulation
             {
                 Transform child = transform.GetChild(i);
                 RadiationDosimeter dosimeter = child.GetComponent<RadiationDosimeter>();
-                Renderer renderer = child.GetComponent<Renderer>();
-                if (dosimeter == null || renderer == null) continue;
+                Renderer renderer = ResolveColorRenderer(child);
+                if (dosimeter == null) continue;
                 dosimeter.Configure(doseToRed, dosimeter.Selectable);
                 dosimeters.Add(dosimeter); displayedDose.Add(0f); colorVelocity.Add(0f); renderers.Add(renderer);
             }
@@ -170,7 +253,13 @@ namespace RadiationSimulation
         }
         public void Rebuild()
         {
-            for (int i=transform.childCount-1; i>=0; i--) Destroy(transform.GetChild(i).gameObject);
+            for (int i=transform.childCount-1; i>=0; i--)
+            {
+                GameObject child = transform.GetChild(i).gameObject;
+                child.transform.SetParent(null);
+                if (Application.isPlaying) Destroy(child);
+                else DestroyImmediate(child);
+            }
             dosimeters.Clear(); displayedDose.Clear(); colorVelocity.Clear(); renderers.Clear();
             SnapToDemoFloor();
             int xCount = Mathf.Max(1, Mathf.FloorToInt(gridSize.x / spacing) + 1);
@@ -182,26 +271,31 @@ namespace RadiationSimulation
             for (int i = 0; i < count; i++)
             {
                 int x = i % xCount;
-                int y = 0;
                 int z = i / xCount;
-                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                var go = dosimeterPrefab != null
+                    ? Instantiate(dosimeterPrefab, transform)
+                    : GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 go.name = $"Dosimeter_{i:000}";
                 go.transform.SetParent(transform, false);
                 go.transform.localPosition = useGrid
                     ? origin + new Vector3(x * spacing, 0f, z * spacing)
                     : gridCenter;
-                go.transform.localScale = Vector3.one * sphereSize;
-                if (sphereMaterial != null)
-                {
-                    go.GetComponent<Renderer>().sharedMaterial = sphereMaterial;
-                }
+                go.transform.localScale = (dosimeterPrefab != null ? dosimeterPrefab.transform.localScale : Vector3.one) * sphereSize;
+                Renderer colorRenderer = ResolveColorRenderer(go.transform);
+                if (dosimeterPrefab == null && sphereMaterial != null && colorRenderer != null)
+                    colorRenderer.sharedMaterial = sphereMaterial;
 
-                var d = go.AddComponent<RadiationDosimeter>();
+                // The receiver and its collider stay on the instance root so particle
+                // intersections work even when only the visual mesh is nested.
+                if (go.GetComponent<Collider>() == null) go.AddComponent<SphereCollider>();
+                var d = go.GetComponent<RadiationDosimeter>();
+                if (d == null) d = go.AddComponent<RadiationDosimeter>();
                 d.Configure(doseToRed);
                 dosimeters.Add(d);
                 displayedDose.Add(0f);
                 colorVelocity.Add(0f);
-                renderers.Add(go.GetComponent<Renderer>());
+                renderers.Add(colorRenderer);
+                PlaceOnDemoFloor(go.transform);
             }
         }
         private void OnValidate()

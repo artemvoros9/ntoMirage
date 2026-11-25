@@ -4,11 +4,24 @@ using UnityEngine;
 namespace RadiationSimulation
 {
     public enum RadiationFlowShape { Omnidirectional, Cone, Ray }
+    public enum RadiationParticleType { Alpha, Beta }
+
+    public static class RadiationParticleProperties
+    {
+        // Scaled simulation units: alpha nuclei are positive and heavy, beta
+        // electrons are negative and light. Their opposite q/m signs make them
+        // turn in opposite directions in the same magnetic field.
+        public static float ChargeToMass(RadiationParticleType type) =>
+            type == RadiationParticleType.Beta ? -2.5f : 0.5f;
+    }
 
     public sealed class RadiationSource : MonoBehaviour
     {
         [Header("Emission")]
         [SerializeField] private RadiationParticle particlePrefab;
+        [SerializeField] private RadiationParticleType particleType = RadiationParticleType.Alpha;
+        public RadiationParticleType ParticleType => particleType;
+        public void SetParticleType(RadiationParticleType type) => particleType = type;
         [SerializeField, Min(0f)] private float emissionRate = 40f;
         [SerializeField, Min(1)] private int maxParticles = 500;
         [SerializeField, Min(0.01f)] private float particleSpeed = 8f;
@@ -66,6 +79,7 @@ namespace RadiationSimulation
                 return;
             }
             particlePrefab = other.particlePrefab;
+            particleType = other.particleType;
             emissionRate = other.emissionRate;
             maxParticles = other.maxParticles;
             particleSpeed = other.particleSpeed;
@@ -133,11 +147,81 @@ namespace RadiationSimulation
             emissionAccumulator -= count;
             for (int i = 0; i < count; i++)
             {
-                Emit();
+                if (!Emit())
+                {
+                    break;
+                }
             }
         }
 
-        private void Emit()
+        /// <summary>Разовый залп для меню частиц: не зависит от EmissionRate и не копит аккумулятор.</summary>
+        public int EmitBurst(int count)
+        {
+            if (count <= 0)
+            {
+                return 0;
+            }
+
+            int emitted = 0;
+            int available = Mathf.Max(0, maxParticles - activeParticles.Count);
+            int total = Mathf.Min(count, available);
+            for (int i = 0; i < total; i++)
+            {
+                if (!Emit())
+                {
+                    break;
+                }
+
+                emitted++;
+            }
+
+            return emitted;
+        }
+
+        /// <summary>Мгновенно убирает все частицы источника, не трогая настройки эмиссии.</summary>
+        public void ClearParticles()
+        {
+            if (activeParticles.Count == 0)
+            {
+                return;
+            }
+
+            // Retire() меняет activeParticles через Despawn(), поэтому работаем по копии.
+            var snapshot = new List<RadiationParticle>(activeParticles);
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                if (snapshot[i] != null)
+                {
+                    snapshot[i].Retire();
+                }
+            }
+
+            activeParticles.Clear();
+        }
+
+        /// <summary>
+        /// Копия активных частиц для UI. Нужна именно копия: набор меняется между
+        /// проходами IMGUI (Layout/Repaint), и живой перечислитель бросил бы
+        /// исключение «collection was modified».
+        /// </summary>
+        public void CopyActiveParticles(List<RadiationParticle> destination)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            destination.Clear();
+            foreach (RadiationParticle particle in activeParticles)
+            {
+                if (particle != null)
+                {
+                    destination.Add(particle);
+                }
+            }
+        }
+
+        private bool Emit()
         {
             if (particlePrefab == null)
             {
@@ -146,7 +230,7 @@ namespace RadiationSimulation
                     Debug.LogError($"{name}: Emit остановлен — поле 'Префаб частицы' пустое. Назначьте prefab с RadiationParticle, Rigidbody и Collider.", this);
                     warnedMissingPrefab = true;
                 }
-                return;
+                return false;
             }
             RadiationParticle particle;
             if (pool.Count > 0)
@@ -163,6 +247,7 @@ namespace RadiationSimulation
             particle.transform.SetPositionAndRotation(transform.position, transform.rotation);
             activeParticles.Add(particle);
             particle.Initialize(this, SampleDirection(), particleSpeed, SampleLifetime(), initialIntensity);
+            return true;
         }
 
         private Vector3 SampleDirection()
